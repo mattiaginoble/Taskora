@@ -1,0 +1,126 @@
+<section class="dash">
+  <div class="toolbar">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="muted">{{ loading() ? 'Caricamento...' : totals() }}</p>
+    </div>
+    <div class="actions">
+      <input
+        type="search"
+        class="input search"
+        [placeholder]="searchPlaceholder()"
+        [attr.aria-label]="searchPlaceholder()"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+      <button
+        type="button"
+        class="btn"
+        [attr.aria-pressed]="!showCompleted()"
+        (click)="showCompleted.set(!showCompleted())"
+      >
+        {{ showCompleted() ? 'Nascondi completate' : 'Mostra completate' }}
+      </button>
+      @if (selectedProject()) {
+        <button type="button" class="btn" (click)="selectedProject.set('')">
+          Tutti i progetti ({{ selectedProject() }})
+        </button>
+      }
+      <button type="button" class="btn btn-primary" (click)="creating.set(true)">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+        Nuova attività
+      </button>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Settori">
+    @for (tab of tabs(); track tab.id) {
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        [attr.aria-selected]="tab.id === selectedSector()"
+        (click)="selectSector(tab.id)"
+      >
+        {{ tab.label }}
+        <span class="count">{{ tab.count }}</span>
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="state muted">Caricamento attività...</p>
+  } @else if (columns().length === 0) {
+    <div class="state">
+      <h2>{{ search() ? 'Nessun risultato' : 'Nessuna attività' }}</h2>
+      <p class="muted">
+        {{
+          search()
+            ? 'Nessuna attività trovata per "' + search() + '"'
+            : 'Non ci sono attività da mostrare al momento'
+        }}
+      </p>
+    </div>
+  } @else {
+    <div class="columns">
+      @for (column of columns(); track column.username) {
+        <section class="column" [class.collapsed]="collapsed().has(column.username)">
+          <button
+            type="button"
+            class="column-header"
+            [attr.aria-expanded]="!collapsed().has(column.username)"
+            (click)="toggleColumn(column.username)"
+          >
+            <span class="avatar">{{ avatar(column.name) }}</span>
+            <span class="name">{{ column.name }}</span>
+            <span class="muted count">
+              {{ column.projects.length }}
+              {{ column.projects.length === 1 ? 'progetto' : 'progetti'
+              }}{{ column.inProgress ? ' · ' + column.inProgress + ' in corso' : '' }}
+            </span>
+            <svg
+              class="chevron"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          @if (!collapsed().has(column.username)) {
+            <div class="cards">
+              @for (project of column.projects; track project.key) {
+                <app-project-card
+                  [project]="project"
+                  (open)="openProject(project)"
+                  (filterProject)="selectedProject.set($event)"
+                />
+              }
+            </div>
+          }
+        </section>
+      }
+    </div>
+  }
+</section>
+
+@if (openRecords().length > 0) {
+  <app-project-detail [records]="openRecords()" (closed)="closeProject()" />
+}
+@if (creating()) {
+  <app-new-activity [sector]="selectedSector()" (closed)="creating.set(false)" />
+}

@@ -1,0 +1,22 @@
+# Taskora su Apache/Aruba.
+# L'app usa indirizzi con # (es. index.html#/attivita), quindi non servono
+# regole di riscrittura e funziona anche dentro una sottocartella.
+
+# index.html sempre aggiornato; i file con l'hash nel nome possono restare in cache
+<IfModule mod_headers.c>
+  <FilesMatch "index\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+# Credenziali e file interni non raggiungibili dal browser
+<FilesMatch "^(config\.local\.php|config\.php)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+RedirectMatch 404 ^(.*/)?storage/

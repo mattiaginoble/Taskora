@@ -1,0 +1,213 @@
+<section class="page-scroll">
+  <div class="page-head">
+    <div>
+      <h1>Attività</h1>
+      <p class="muted">{{ loading() ? 'Caricamento...' : summary() }}</p>
+    </div>
+    <button type="button" class="btn btn-primary" (click)="creating.set(true)">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path d="M12 5v14M5 12h14"></path>
+      </svg>
+      Nuova attività
+    </button>
+  </div>
+
+  <div class="panel">
+    <div class="filters">
+      <label class="field grow">
+        <span>Cerca</span>
+        <input
+          type="search"
+          placeholder="Dipendente, progetto, task"
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+        />
+      </label>
+      <label class="field">
+        <span>Settore</span>
+        <select [value]="sector()" (change)="sector.set($any($event.target).value)">
+          <option value="">Tutti</option>
+          @for (item of work.sectors(); track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>Stato</span>
+        <select [value]="status()" (change)="status.set($any($event.target).value)">
+          <option value="">Tutti</option>
+          @for (item of statuses; track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      </label>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!!status()"
+        [attr.aria-pressed]="showCompleted()"
+        (click)="showCompleted.set(!showCompleted())"
+      >
+        {{ showCompleted() ? 'Nascondi completate' : 'Mostra completate' }}
+      </button>
+      @if (selectable().length > 0) {
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="completing()"
+          (click)="completeSelected()"
+        >
+          {{ completing() ? 'Salvataggio...' : 'Segna completate (' + selectable().length + ')' }}
+        </button>
+      }
+    </div>
+
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th class="check">
+              <input
+                type="checkbox"
+                aria-label="Seleziona tutte le attività aperte"
+                [checked]="allSelected()"
+                (change)="toggleAll($any($event.target).checked)"
+              />
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'utente'"
+                (click)="sortBy('utente')"
+              >
+                Dipendente <span aria-hidden="true">{{ sortIcon('utente') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'progetto'"
+                (click)="sortBy('progetto')"
+              >
+                Progetto <span aria-hidden="true">{{ sortIcon('progetto') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'settore'"
+                (click)="sortBy('settore')"
+              >
+                Settore <span aria-hidden="true">{{ sortIcon('settore') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'task'"
+                (click)="sortBy('task')"
+              >
+                Ultima task <span aria-hidden="true">{{ sortIcon('task') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'scadenza'"
+                (click)="sortBy('scadenza')"
+              >
+                Scadenza <span aria-hidden="true">{{ sortIcon('scadenza') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'priorita'"
+                (click)="sortBy('priorita')"
+              >
+                Priorità <span aria-hidden="true">{{ sortIcon('priorita') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'avanzamento'"
+                (click)="sortBy('avanzamento')"
+              >
+                Avanzamento <span aria-hidden="true">{{ sortIcon('avanzamento') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'stato'"
+                (click)="sortBy('stato')"
+              >
+                Stato <span aria-hidden="true">{{ sortIcon('stato') }}</span>
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.task.id) {
+            <tr class="clickable" [class.overdue]="row.overdue" (click)="edit(row.task)">
+              <td class="check" (click)="$event.stopPropagation()">
+                @if (row.task.stato !== 'Completato') {
+                  <input
+                    type="checkbox"
+                    [attr.aria-label]="'Seleziona ' + row.task.progetto"
+                    [checked]="selected().has(row.task.id)"
+                    (change)="toggle(row.task.id, $any($event.target).checked)"
+                  />
+                }
+              </td>
+              <td class="nowrap">{{ row.employee }}</td>
+              <td class="strong">{{ row.task.progetto }}</td>
+              <td class="nowrap">{{ row.task.settore || '-' }}</td>
+              <td class="task" [title]="row.lastTask">{{ row.lastTask }}</td>
+              <td class="nowrap" [class.bad]="row.overdue">{{ formatDate(row.task.scadenza) }}</td>
+              <td><app-priority-badge [priority]="row.task.priorita" /></td>
+              <td class="progress"><app-schedule-bar [task]="row.task" /></td>
+              <td><app-status-badge [status]="row.task.stato" /></td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="9" class="empty">
+                {{
+                  loading()
+                    ? 'Caricamento...'
+                    : work.tasks().length === 0
+                      ? 'Nessuna attività: creane una con "Nuova attività".'
+                      : 'Nessuna attività con i filtri scelti.'
+                }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+@if (creating()) {
+  <app-new-activity [sector]="sector()" (closed)="creating.set(false)" />
+}
+@if (editing(); as task) {
+  <app-activity-editor [task]="task" (closed)="closeEditor()" />
+}

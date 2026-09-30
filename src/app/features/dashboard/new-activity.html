@@ -1,0 +1,117 @@
+<app-dialog title="Nuova attività" (closed)="closed.emit()">
+  <form class="form-grid" (ngSubmit)="save()">
+    <label class="field">
+      <span>Progetto</span>
+      <input
+        name="progetto"
+        list="project-list"
+        [(ngModel)]="progetto"
+        placeholder="Scrivi o scegli un progetto"
+        autocomplete="off"
+        required
+        autofocus
+      />
+      <datalist id="project-list">
+        @for (project of work.projects(); track project.id) {
+          <option [value]="project.nome"></option>
+        }
+      </datalist>
+    </label>
+    <label class="field">
+      <span>Settore</span>
+      <select name="settore" [(ngModel)]="settore" required>
+        <option value="">Scegli il settore</option>
+        @for (sector of work.sectors(); track sector) {
+          <option [value]="sector">{{ sector }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="field wide">
+      <span>Task</span>
+      <textarea
+        name="note"
+        rows="3"
+        [(ngModel)]="note"
+        placeholder="Descrivi la prima task da svolgere"
+        required
+      ></textarea>
+    </label>
+
+    <div class="field">
+      <label for="new-due">Scadenza</label>
+      <input
+        id="new-due"
+        name="scadenza"
+        type="date"
+        [(ngModel)]="scadenza"
+        [min]="session.isAdmin() ? null : today"
+      />
+      <div class="chips">
+        <button type="button" class="chip" (click)="setDue(0)">Oggi</button>
+        <button type="button" class="chip" (click)="setDue(7)">+1 settimana</button>
+        <button type="button" class="chip" (click)="setDue(30)">+1 mese</button>
+      </div>
+    </div>
+    <label class="field">
+      <span>Ore lavorate <small>(facoltative)</small></span>
+      <input
+        name="ore"
+        type="number"
+        min="0.25"
+        max="24"
+        step="0.25"
+        inputmode="decimal"
+        placeholder="es. 1,5"
+        [(ngModel)]="ore"
+      />
+    </label>
+
+    @if (session.isAdmin()) {
+      <label class="field">
+        <span>Responsabile</span>
+        <select name="assegnato" [(ngModel)]="assegnato">
+          <option value="">Nessuno</option>
+          @for (admin of work.administrators(); track admin.username) {
+            <option [value]="admin.username">{{ admin.display_name }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>Priorità</span>
+        <select name="priorita" [(ngModel)]="priorita">
+          @for (priority of priorities; track priority) {
+            <option [value]="priority">{{ priority }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>Stato</span>
+        <select name="stato" [(ngModel)]="stato">
+          @for (status of statuses; track status) {
+            <option [value]="status">{{ status }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span
+          >Avanzamento <strong>{{ avanzamento }}%</strong></span
+        >
+        <input
+          name="avanzamento"
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          [(ngModel)]="avanzamento"
+        />
+      </label>
+    }
+
+    <div class="wide actions">
+      <button type="submit" class="btn btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Creazione...' : 'Crea attività' }}
+      </button>
+    </div>
+  </form>
+</app-dialog>

@@ -1,0 +1,38 @@
+:host {
+  display: block;
+  height: 100%;
+}
+.small {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+}
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+.inline-form .field {
+  min-width: 160px;
+}
+.compact {
+  min-height: 34px;
+  padding: 4px var(--space-2);
+}
+td .input.compact {
+  min-width: 160px;
+}
+.strong {
+  font-weight: 700;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.actions {
+  text-align: right;
+}
+@media (max-width: 900px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

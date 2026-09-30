@@ -1,0 +1,62 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+    outline: none;
+  }
+  &.is-overdue {
+    border-color: var(--color-overdue);
+    background: linear-gradient(90deg, var(--color-surface-2), var(--bar-late-track));
+  }
+  &.is-completed {
+    border-style: dashed;
+    opacity: 0.65;
+  }
+}
+.project {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 12rem;
+  overflow: hidden;
+  border: 0;
+  text-overflow: ellipsis;
+  cursor: pointer;
+
+  &:hover {
+    outline: 1px solid var(--tag-fg);
+  }
+}
+.progress {
+  flex: 1 1 auto;
+}
+.due {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+
+  &.overdue {
+    color: var(--color-overdue);
+    font-weight: 700;
+  }
+}
+@media (max-width: 480px) {
+  .project {
+    max-width: 8rem;
+  }
+}

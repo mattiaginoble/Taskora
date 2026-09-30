@@ -1,0 +1,226 @@
+<section class="page-scroll">
+  <div class="page-head">
+    <div>
+      <h1>Gestione</h1>
+      <p class="muted">Utenti, settori e progetti.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div>
+      <h2>Utenti</h2>
+      <p class="muted small">
+        Il nome visualizzato compare in tutta l'app; il nome utente serve solo per accedere. Chi
+        riceve una password da qui deve cambiarla al primo accesso.
+      </p>
+    </div>
+    <form class="inline-form" (ngSubmit)="createUser()">
+      <label class="field">
+        <span>Nome visualizzato</span>
+        <input name="newName" maxlength="100" placeholder="es. Mario Rossi" [(ngModel)]="newName" />
+      </label>
+      <label class="field">
+        <span>Nome utente (accesso)</span>
+        <input
+          name="newUsername"
+          required
+          pattern="[A-Za-z0-9._\-]{3,50}"
+          autocomplete="off"
+          [(ngModel)]="newUsername"
+        />
+      </label>
+      <label class="field">
+        <span>Ruolo</span>
+        <select name="newRole" [(ngModel)]="newRole">
+          <option value="user">Dipendente</option>
+          <option value="administrator">Amministratore</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Password temporanea</span>
+        <input
+          name="newPassword"
+          required
+          minlength="8"
+          autocomplete="off"
+          [(ngModel)]="newPassword"
+        />
+      </label>
+      <button type="button" class="btn" (click)="generate()">Genera</button>
+      <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea utente</button>
+    </form>
+
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Nome visualizzato</th>
+            <th>Nome utente</th>
+            <th>Ruolo</th>
+            <th>Password</th>
+            <th>Creato il</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr>
+              <td>
+                <input
+                  #name
+                  class="input compact"
+                  maxlength="100"
+                  [value]="user.display_name ?? ''"
+                  [placeholder]="user.username"
+                  [attr.aria-label]="'Nome visualizzato di ' + user.username"
+                  (change)="saveName(user, name)"
+                  (keydown.enter)="name.blur()"
+                />
+              </td>
+              <td class="nowrap">{{ user.username }}{{ user.isSelf ? ' (tu)' : '' }}</td>
+              <td>
+                <select
+                  #role
+                  class="input compact"
+                  [disabled]="user.isSelf"
+                  [title]="user.isSelf ? 'Non puoi cambiare il tuo ruolo' : ''"
+                  (change)="setRole(user, role.value, role)"
+                >
+                  <option value="user" [selected]="user.role === 'user'">Dipendente</option>
+                  <option value="administrator" [selected]="user.role === 'administrator'">
+                    Amministratore
+                  </option>
+                </select>
+              </td>
+              <td class="nowrap">
+                @if (user.pending) {
+                  <span class="badge pr-medium">Da cambiare</span>
+                } @else {
+                  <span class="badge st-done">Impostata</span>
+                }
+              </td>
+              <td class="nowrap">{{ user.created }}</td>
+              <td class="actions">
+                <button type="button" class="btn btn-sm" (click)="openReset(user)">
+                  Reimposta password
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="empty">
+                {{ loading() ? 'Caricamento...' : 'Nessun utente' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="columns">
+    <div class="panel">
+      <div>
+        <h2>Settori</h2>
+        <p class="muted small">
+          Dividono dashboard e riepilogo; ogni nuova attività ne richiede uno.
+        </p>
+      </div>
+      <form class="inline-form" (ngSubmit)="createSector()">
+        <label class="field">
+          <span>Nome settore</span>
+          <input name="newSector" required maxlength="50" [(ngModel)]="newSector" />
+        </label>
+        <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea settore</button>
+      </form>
+      <div class="table-wrap">
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Settore</th>
+              <th class="num">Attività</th>
+              <th>Creato il</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (sector of data()?.sectors ?? []; track sector.id) {
+              <tr>
+                <td class="strong">{{ sector.nome }}</td>
+                <td class="num">{{ sector.attivita }}</td>
+                <td class="nowrap">{{ date(sector.created_at) }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="3" class="empty">
+                  {{ loading() ? 'Caricamento...' : 'Nessun settore' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div>
+        <h2>Progetti</h2>
+        <p class="muted small">Le attività possono usare solo i progetti creati qui.</p>
+      </div>
+      <form class="inline-form" (ngSubmit)="createProject()">
+        <label class="field">
+          <span>Nome progetto</span>
+          <input name="newProject" required maxlength="100" [(ngModel)]="newProject" />
+        </label>
+        <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea progetto</button>
+      </form>
+      <div class="table-wrap">
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Progetto</th>
+              <th class="num">Attività</th>
+              <th>Creato il</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (project of data()?.projects ?? []; track project.id) {
+              <tr>
+                <td class="strong">{{ project.nome }}</td>
+                <td class="num">{{ project.attivita }}</td>
+                <td class="nowrap">{{ date(project.created_at) }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="3" class="empty">
+                  {{ loading() ? 'Caricamento...' : 'Nessun progetto' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+@if (resetting(); as user) {
+  <app-dialog title="Reimposta password" size="sm" (closed)="resetting.set(null)">
+    <form class="form-stack" (ngSubmit)="confirmReset()">
+      <p class="muted">
+        Nuova password temporanea per <strong>{{ user.display_name || user.username }}</strong
+        >. Dovrà cambiarla al primo accesso; se era bloccato per troppi tentativi viene sbloccato.
+      </p>
+      <label class="field">
+        <span>Password temporanea <small>(almeno 8 caratteri)</small></span>
+        <input
+          name="resetPassword"
+          required
+          minlength="8"
+          autocomplete="off"
+          [(ngModel)]="resetPassword"
+        />
+      </label>
+      <button type="submit" class="btn btn-primary" [disabled]="busy()">Reimposta</button>
+    </form>
+  </app-dialog>
+}

@@ -1,0 +1,170 @@
+import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { Task } from '../../core/models';
+import { PeopleService } from '../../core/people';
+import { SessionService } from '../../core/session';
+import { ProjectSummary, groupByProject, sortTasks } from '../../core/task-utils';
+import { ToastService } from '../../core/toast';
+import { WorkService } from '../../core/work';
+import { NewActivity } from './new-activity';
+import { ProjectCard } from './project-card';
+import { ProjectDetail } from './project-detail';
+
+/** Scheda "Senza settore": attività create prima che il settore fosse obbligatorio. */
+const NO_SECTOR = '__none__';
+
+interface EmployeeColumn {
+  username: string;
+  name: string;
+  projects: ProjectSummary[];
+  inProgress: number;
+}
+
+@Component({
+  selector: 'app-dashboard',
+  imports: [ProjectCard, ProjectDetail, NewActivity],
+  templateUrl: './dashboard.html',
+  styleUrl: './dashboard.scss',
+})
+export class DashboardPage {
+  protected readonly work = inject(WorkService);
+  protected readonly session = inject(SessionService);
+  private readonly people = inject(PeopleService);
+  private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+
+  /** Settore dall'indirizzo (?settore=IT), così il filtro resta nei segnalibri. */
+  readonly settore = input<string>();
+
+  protected readonly loading = signal(true);
+  protected readonly search = signal('');
+  protected readonly showCompleted = signal(true);
+  protected readonly selectedProject = signal('');
+  protected readonly collapsed = signal(new Set<string>());
+  protected readonly creating = signal(false);
+  /** Attività del progetto aperto nel dettaglio (per id, così si aggiornano dopo un salvataggio). */
+  private readonly openIds = signal<string[] | null>(null);
+
+  /** Scheda scelta: parte dall'indirizzo ma si può cambiare dalla pagina. */
+  protected readonly selectedSector = linkedSignal(() => this.settore() ?? '');
+  protected readonly searchPlaceholder = computed(() =>
+    this.session.isAdmin() ? 'Cerca progetto o dipendente' : 'Cerca progetto',
+  );
+
+  /** Attività filtrate da ricerca, completate e progetto (non dal settore). */
+  private readonly baseTasks = computed(() => {
+    const query = this.search().trim().toLowerCase();
+    return sortTasks(this.work.tasks()).filter((task) => {
+      if (this.selectedProject() && task.progetto !== this.selectedProject()) return false;
+      if (!this.showCompleted() && task.stato === 'Completato') return false;
+      if (!query) return true;
+      return [
+        task.utente,
+        this.people.name(task.utente),
+        task.progetto,
+        task.assegnato_a,
+        this.people.name(task.assegnato_a),
+        task.priorita,
+      ].some((value) =>
+        String(value ?? '')
+          .toLowerCase()
+          .includes(query),
+      );
+    });
+  });
+
+  private readonly matchesSector = (task: Task, sector: string): boolean =>
+    sector === NO_SECTOR ? !task.settore : task.settore === sector;
+
+  protected readonly tabs = computed(() => {
+    const tasks = this.baseTasks();
+    const countProjects = (list: Task[]) =>
+      new Set(list.map((t) => `${t.utente}|${String(t.progetto).toLowerCase()}`)).size;
+    const tabs = [
+      { id: '', label: 'Tutti', count: countProjects(tasks) },
+      ...this.work.sectors().map((sector) => ({
+        id: sector,
+        label: sector,
+        count: countProjects(tasks.filter((t) => t.settore === sector)),
+      })),
+    ];
+    const withoutSector = tasks.filter((t) => !t.settore);
+    if (withoutSector.length > 0) {
+      tabs.push({ id: NO_SECTOR, label: 'Senza settore', count: countProjects(withoutSector) });
+    }
+    return tabs;
+  });
+
+  /** Una colonna per dipendente (titolare dell'attività), in ordine di nome. */
+  protected readonly columns = computed<EmployeeColumn[]>(() => {
+    const sector = this.selectedSector();
+    const tasks = sector
+      ? this.baseTasks().filter((t) => this.matchesSector(t, sector))
+      : this.baseTasks();
+    const byEmployee = new Map<string, Task[]>();
+    for (const task of tasks) {
+      const username = task.utente || 'Sconosciuto';
+      byEmployee.set(username, [...(byEmployee.get(username) ?? []), task]);
+    }
+    return [...byEmployee.entries()]
+      .map(([username, list]) => {
+        const projects = groupByProject(list);
+        return {
+          username,
+          name: this.people.name(username),
+          projects,
+          inProgress: projects.filter((p) => p.stato === 'In corso').length,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
+  });
+
+  protected readonly totals = computed(() => {
+    const columns = this.columns();
+    const projects = columns.reduce((sum, c) => sum + c.projects.length, 0);
+    const inProgress = columns.reduce((sum, c) => sum + c.inProgress, 0);
+    if (projects === 0) return 'Nessun progetto';
+    return `${projects} ${projects === 1 ? 'progetto' : 'progetti'}${inProgress ? ` · ${inProgress} in corso` : ''}`;
+  });
+
+  protected readonly openRecords = computed(() => {
+    const ids = this.openIds();
+    return ids ? this.work.tasks().filter((t) => ids.includes(t.id)) : [];
+  });
+
+  constructor() {
+    this.work
+      .load()
+      .catch((error) => this.toast.error(error))
+      .finally(() => this.loading.set(false));
+  }
+
+  protected selectSector(id: string): void {
+    this.selectedSector.set(id);
+    // "Senza settore" resta solo nella pagina, gli altri anche nell'indirizzo
+    this.router.navigate([], {
+      queryParams: { settore: id && id !== NO_SECTOR ? id : null },
+      replaceUrl: true,
+    });
+  }
+
+  protected toggleColumn(username: string): void {
+    this.collapsed.update((set) => {
+      const next = new Set(set);
+      if (!next.delete(username)) next.add(username);
+      return next;
+    });
+  }
+
+  protected openProject(project: ProjectSummary): void {
+    this.openIds.set(project.records.map((r) => r.id));
+  }
+
+  protected closeProject(): void {
+    this.openIds.set(null);
+  }
+
+  protected avatar(name: string): string {
+    return name.charAt(0).toUpperCase();
+  }
+}

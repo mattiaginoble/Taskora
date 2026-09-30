@@ -1,0 +1,32 @@
+<main class="screen">
+  <section class="card">
+    <header>
+      <img src="favicon.svg" alt="" width="40" height="40" />
+      <h1>Accedi a {{ appName }}</h1>
+      <p class="muted">Inserisci le tue credenziali per continuare.</p>
+    </header>
+
+    <form class="form-stack" (ngSubmit)="submit()">
+      <label class="field">
+        <span>Nome utente</span>
+        <input name="username" autocomplete="username" [(ngModel)]="username" required autofocus />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          [(ngModel)]="password"
+          required
+        />
+      </label>
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+      <button type="submit" class="btn btn-primary" [disabled]="loading()">
+        {{ loading() ? 'Accesso...' : 'Accedi' }}
+      </button>
+    </form>
+  </section>
+</main>
