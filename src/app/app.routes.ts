@@ -22,12 +22,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.DashboardPage),
       },
       {
-        path: 'attivita',
-        title: pageTitle('Attività'),
+        path: 'task',
+        title: pageTitle('Task'),
         canActivate: [adminGuard],
-        loadComponent: () =>
-          import('./features/activities/activities').then((m) => m.ActivitiesPage),
+        loadComponent: () => import('./features/tasks/tasks-page').then((m) => m.TasksPage),
       },
+      // Indirizzo della pagina quando si chiamava "Attività"
+      { path: 'attivita', redirectTo: 'task' },
       {
         path: 'riepilogo',
         title: pageTitle('Riepilogo'),

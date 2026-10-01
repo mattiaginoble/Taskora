@@ -38,7 +38,7 @@
         >
           <path d="M12 5v14M5 12h14"></path>
         </svg>
-        Nuova attività
+        Nuova task
       </button>
     </div>
   </div>
@@ -59,15 +59,15 @@
   </div>
 
   @if (loading()) {
-    <p class="state muted">Caricamento attività...</p>
+    <p class="state muted">Caricamento task...</p>
   } @else if (columns().length === 0) {
     <div class="state">
-      <h2>{{ search() ? 'Nessun risultato' : 'Nessuna attività' }}</h2>
+      <h2>{{ search() ? 'Nessun risultato' : 'Nessuna task' }}</h2>
       <p class="muted">
         {{
           search()
-            ? 'Nessuna attività trovata per "' + search() + '"'
-            : 'Non ci sono attività da mostrare al momento'
+            ? 'Nessuna task trovata per "' + search() + '"'
+            : 'Non ci sono task da mostrare al momento'
         }}
       </p>
     </div>
@@ -106,7 +106,7 @@
               @for (project of column.projects; track project.key) {
                 <app-project-card
                   [project]="project"
-                  (open)="openProject(project)"
+                  (open)="openProject(column.username, project)"
                   (filterProject)="selectedProject.set($event)"
                 />
               }
@@ -122,5 +122,5 @@
   <app-project-detail [records]="openRecords()" (closed)="closeProject()" />
 }
 @if (creating()) {
-  <app-new-activity [sector]="selectedSector()" (closed)="creating.set(false)" />
+  <app-new-task [sector]="selectedSector()" (closed)="creating.set(false)" />
 }

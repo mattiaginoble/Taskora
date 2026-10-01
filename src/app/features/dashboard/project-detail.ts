@@ -1,239 +1,82 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { TASK_STATUSES, Task, TaskEvent, TaskStatus } from '../../core/models';
+import { Task } from '../../core/models';
 import { PeopleService } from '../../core/people';
-import { SessionService } from '../../core/session';
-import {
-  clampProgress,
-  describeSchedule,
-  formatDate,
-  formatDateTime,
-  formatHours,
-  parseTaskEntries,
-  summarizeProject,
-} from '../../core/task-utils';
-import { ToastService } from '../../core/toast';
-import { WorkService } from '../../core/work';
+import { formatDate, formatHours, isOverdue, summarizeProject } from '../../core/task-utils';
 import { PriorityBadge, StatusBadge } from '../../shared/badges';
 import { Dialog } from '../../shared/dialog';
 import { ScheduleBar } from '../../shared/schedule-bar';
+import { NewTask } from '../tasks/new-task';
+import { TaskEditor } from '../tasks/task-editor';
 
-const FIELD_LABELS: Record<string, string> = {
-  utente: 'owner del task',
-  progetto: 'progetto',
-  descrizione: 'descrizione',
-  scadenza: 'scadenza',
-  assegnato_a: 'responsabile',
-  priorita: 'priorità',
-  settore: 'settore',
-  stato: 'stato',
-  avanzamento: 'avanzamento',
-};
+const STATUS_ORDER = { 'In corso': 0, Bloccato: 1, 'Da fare': 2, Completato: 3 } as const;
 
-/** Dettaglio di un progetto: riepilogo, task, aggiornamento e registro. */
+/** Un progetto: riepilogo in alto, le sue task a sinistra e la task scelta a destra. */
 @Component({
   selector: 'app-project-detail',
-  imports: [Dialog, FormsModule, StatusBadge, PriorityBadge, ScheduleBar],
+  imports: [Dialog, StatusBadge, PriorityBadge, ScheduleBar, TaskEditor, NewTask],
   templateUrl: './project-detail.html',
   styleUrl: './project-detail.scss',
 })
 export class ProjectDetail {
-  private readonly work = inject(WorkService);
-  private readonly toast = inject(ToastService);
-  protected readonly people = inject(PeopleService);
-  protected readonly session = inject(SessionService);
+  private readonly people = inject(PeopleService);
 
-  /** Attività del progetto (aggiornate dal genitore dopo ogni salvataggio). */
+  /** Task del progetto (sempre aggiornate dal genitore). */
   readonly records = input.required<Task[]>();
   readonly closed = output<void>();
 
-  protected readonly statuses = TASK_STATUSES;
   protected readonly formatDate = formatDate;
   protected readonly summary = computed(() => summarizeProject(this.records()));
-  protected readonly eyebrow = computed(() => {
-    const count = this.records().length;
-    return [
+  protected readonly eyebrow = computed(() =>
+    [
       this.summary().settori.join(', ') || 'Senza settore',
-      count > 1 ? `${count} attività` : '',
+      this.people.names(this.records().map((r) => r.utente)),
     ]
       .filter(Boolean)
-      .join(' · ');
-  });
+      .join(' · '),
+  );
+  protected readonly done = computed(
+    () => this.records().filter((r) => r.stato === 'Completato').length,
+  );
+  protected readonly hours = computed(() => formatHours(this.summary().ore_lavorate));
 
-  /** Attività scelta: stato, barra e dati in alto si riferiscono a lei, non a tutto il progetto. */
+  /** Prima quelle in corso e bloccate, poi da fare e completate; a parità, la scadenza più vicina. */
+  protected readonly tasks = computed(() =>
+    [...this.records()]
+      .sort(
+        (a, b) =>
+          STATUS_ORDER[a.stato] - STATUS_ORDER[b.stato] ||
+          String(a.scadenza).localeCompare(String(b.scadenza)) ||
+          String(a.created_at).localeCompare(String(b.created_at)),
+      )
+      .map((task) => ({
+        task,
+        overdue: isOverdue(task.scadenza, task.stato),
+        owner: this.people.name(task.utente),
+      })),
+  );
+
   protected readonly selectedId = signal('');
   protected readonly selected = computed(
     () => this.records().find((r) => r.id === this.selectedId()) ?? null,
   );
-  protected readonly current = computed(() => {
-    const selected = this.selected();
-    return summarizeProject(selected ? [selected] : this.records());
-  });
-  protected readonly schedule = computed(() => describeSchedule(this.current()));
-  protected readonly owner = computed(() => this.people.name(this.selected()?.utente) || '-');
-  protected readonly assignedBy = computed(
-    () => this.people.name(this.selected()?.creato_da) || '-',
-  );
-  protected readonly hours = computed(() => formatHours(this.current().ore_lavorate));
-  protected readonly lastUpdate = computed(() => formatDateTime(this.current().updated_at));
-
-  /**
-   * Task di tutte le attività, dalla più recente. Ognuna riporta l'owner della sua
-   * attività (e chi l'ha scritta, se è un'altra persona); con più attività anche
-   * stato e scadenza, e un clic sceglie l'attività.
-   */
-  protected readonly entries = computed(() => {
-    const multiple = this.records().length > 1;
-    return this.records()
-      .flatMap((record, recordIndex) =>
-        parseTaskEntries(record.note).map((entry, entryIndex) => {
-          const owner = this.people.name(record.utente);
-          const author = this.people.name(entry.user);
-          return {
-            ...entry,
-            owner,
-            writtenBy: author && author !== owner ? author : '',
-            record,
-            multiple,
-            recordIndex,
-            entryIndex,
-          };
-        }),
-      )
-      .sort(
-        (a, b) =>
-          b.sortKey.localeCompare(a.sortKey) ||
-          a.recordIndex - b.recordIndex ||
-          b.entryIndex - a.entryIndex,
-      );
-  });
-
-  /** Attività aggiornabili: prima le aperte, poi le più recenti. */
-  protected readonly options = computed(() =>
-    [...this.records()]
-      .sort(
-        (a, b) =>
-          Number(a.stato === 'Completato') - Number(b.stato === 'Completato') ||
-          String(b.created_at).localeCompare(String(a.created_at)),
-      )
-      .map((record) => {
-        const last = parseTaskEntries(record.note).pop()?.message ?? '-';
-        return {
-          id: record.id,
-          label: `${record.stato} · scad. ${formatDate(record.scadenza)} · ${last.length > 50 ? last.slice(0, 50) + '…' : last}`,
-        };
-      }),
-  );
-
-  // Modulo di aggiornamento
-  protected ownerInput = '';
-  protected note = '';
-  protected hoursInput: number | null = null;
-  protected stato: TaskStatus = 'Da fare';
-  protected avanzamento = 0;
-  protected readonly saving = signal(false);
-
-  // Registro modifiche (solo admin)
-  protected readonly events = signal<TaskEvent[] | null>(null);
-  protected readonly eventsError = signal('');
+  protected readonly creating = signal(false);
 
   constructor() {
-    // Sceglie la prima attività aperta e ne copia stato e avanzamento
+    // Se la task scelta non c'è più (eliminata o passata a un altro owner) si prende la prima
     effect(() => {
-      const options = this.options();
-      const current = this.selectedId();
-      if (!options.some((o) => o.id === current)) this.selectRecord(options[0]?.id ?? '');
+      if (!this.selected()) this.selectedId.set(this.tasks()[0]?.task.id ?? '');
     });
   }
 
-  protected selectRecord(id: string): void {
+  /** Su schermi stretti la task scelta sta sotto l'elenco: ci si sposta lì. */
+  protected select(id: string, panel: HTMLElement): void {
     this.selectedId.set(id);
-    const record = this.records().find((r) => r.id === id);
-    if (record) {
-      this.ownerInput = record.utente;
-      this.stato = record.stato;
-      this.avanzamento = clampProgress(record.avanzamento);
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     }
   }
 
-  protected async save(): Promise<void> {
-    const record = this.records().find((r) => r.id === this.selectedId());
-    if (!record) return;
-    const note = this.note.trim();
-    const ore = this.hoursInput ? String(this.hoursInput) : '';
-    // Solo gli admin cambiano l'owner (il server lo ignora per gli altri)
-    const owner =
-      this.session.isAdmin() && this.ownerInput && this.ownerInput !== record.utente
-        ? this.ownerInput
-        : '';
-    if (
-      !note &&
-      !ore &&
-      !owner &&
-      this.stato === record.stato &&
-      this.avanzamento === clampProgress(record.avanzamento)
-    ) {
-      this.toast.show('Nessuna modifica da salvare', true);
-      return;
-    }
-    this.saving.set(true);
-    try {
-      await this.work.update({
-        id: record.id,
-        stato: this.stato,
-        avanzamento: this.avanzamento,
-        note_append: note,
-        ore,
-        ...(owner ? { utente: owner } : {}),
-      });
-      this.note = '';
-      this.hoursInput = null;
-      this.events.set(null);
-      this.toast.show('Attività aggiornata');
-    } catch (error) {
-      this.toast.error(error);
-    } finally {
-      this.saving.set(false);
-    }
-  }
-
-  protected async loadEvents(open: boolean): Promise<void> {
-    if (!open || this.events()) return;
-    this.eventsError.set('');
-    try {
-      this.events.set(await this.work.events(this.records().map((r) => r.id)));
-    } catch (error) {
-      this.eventsError.set(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  protected describeEvent(event: TaskEvent): string {
-    const value = (field: string | null, raw: string | null): string => {
-      if (raw === null || raw === '') return '—';
-      if (field === 'scadenza') return formatDate(raw);
-      if (field === 'avanzamento') return `${raw}%`;
-      if (field === 'assegnato_a' || field === 'utente') return this.people.name(raw);
-      return raw;
-    };
-    switch (event.event_type) {
-      case 'created':
-        return "ha creato l'attività";
-      case 'task_added':
-        return `ha aggiunto la task: «${event.new_value ?? ''}»`;
-      case 'hours_logged':
-        return `ha registrato ${formatHours(event.new_value)} di lavoro`;
-      case 'field_changed':
-        return `ha cambiato ${FIELD_LABELS[event.field ?? ''] ?? event.field}: ${value(event.field, event.old_value)} → ${value(event.field, event.new_value)}`;
-      case 'history_edited':
-        return 'ha riscritto lo storico delle task';
-      case 'deleted':
-        return "ha eliminato l'attività";
-      default:
-        return event.event_type;
-    }
-  }
-
-  protected eventMeta(event: TaskEvent): string {
-    return `${this.people.name(event.username)} - ${formatDateTime(event.created_at)}`;
+  protected onCreated(task: Task): void {
+    this.selectedId.set(task.id);
   }
 }

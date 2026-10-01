@@ -1,7 +1,7 @@
 <section class="page-scroll">
   <div class="page-head">
     <div>
-      <h1>Attività</h1>
+      <h1>Task</h1>
       <p class="muted">{{ loading() ? 'Caricamento...' : summary() }}</p>
     </div>
     <button type="button" class="btn btn-primary" (click)="creating.set(true)">
@@ -16,7 +16,7 @@
       >
         <path d="M12 5v14M5 12h14"></path>
       </svg>
-      Nuova attività
+      Nuova task
     </button>
   </div>
 
@@ -77,7 +77,7 @@
             <th class="check">
               <input
                 type="checkbox"
-                aria-label="Seleziona tutte le attività aperte"
+                aria-label="Seleziona tutte le task aperte"
                 [checked]="allSelected()"
                 (change)="toggleAll($any($event.target).checked)"
               />
@@ -129,7 +129,7 @@
                 [class.active]="sort().field === 'task'"
                 (click)="sortBy('task')"
               >
-                Ultima task <span aria-hidden="true">{{ sortIcon('task') }}</span>
+                Task <span aria-hidden="true">{{ sortIcon('task') }}</span>
               </button>
             </th>
             <th>
@@ -191,7 +191,7 @@
               <td class="nowrap">{{ row.assignedBy }}</td>
               <td class="strong">{{ row.task.progetto }}</td>
               <td class="nowrap">{{ row.task.settore || '-' }}</td>
-              <td class="task" [title]="row.lastTask">{{ row.lastTask }}</td>
+              <td class="task" [title]="row.task.titolo">{{ row.task.titolo }}</td>
               <td class="nowrap" [class.bad]="row.overdue">{{ formatDate(row.task.scadenza) }}</td>
               <td><app-priority-badge [priority]="row.task.priorita" /></td>
               <td class="progress"><app-schedule-bar [task]="row.task" /></td>
@@ -204,8 +204,8 @@
                   loading()
                     ? 'Caricamento...'
                     : work.tasks().length === 0
-                      ? 'Nessuna attività: creane una con "Nuova attività".'
-                      : 'Nessuna attività con i filtri scelti.'
+                      ? 'Nessuna task: creane una con "Nuova task".'
+                      : 'Nessuna task con i filtri scelti.'
                 }}
               </td>
             </tr>
@@ -217,8 +217,8 @@
 </section>
 
 @if (creating()) {
-  <app-new-activity [sector]="sector()" (closed)="creating.set(false)" />
+  <app-new-task [sector]="sector()" (closed)="creating.set(false)" />
 }
-@if (editing(); as task) {
-  <app-activity-editor [task]="task" (closed)="closeEditor()" />
+@if (editingId(); as id) {
+  <app-task-dialog [taskId]="id" (closed)="editingId.set(null)" />
 }

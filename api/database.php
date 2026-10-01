@@ -6,13 +6,13 @@ date_default_timezone_set('Europe/Rome');
 
 // Versione dello schema: aumentarla quando si aggiunge una migrazione in
 // bootstrapDatabase(), così viene eseguita una sola volta.
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const TASK_STATUSES = ['Da fare', 'In corso', 'Completato', 'Bloccato'];
 const TASK_PRIORITIES = ['Bassa', 'Media', 'Alta'];
 // Settori creati alla prima installazione; gli admin ne aggiungono altri dal web.
 const DEFAULT_SECTORS = ['IT', 'Commerciale', 'Logistica', 'Scansioni'];
-const TASK_COLUMNS = 'id, utente, creato_da, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at';
+const TASK_COLUMNS = 'id, titolo, utente, creato_da, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at';
 
 function getAppConfig(): array
 {
@@ -181,6 +181,8 @@ function bootstrapDatabase(array $config, string $markerFile): void
         // Chi ha creato e assegnato l'attività ("Assegnato da"). La vecchia colonna
         // assegnato_a (il "responsabile" scelto a mano) resta nel database ma non si usa più.
         ['tasks', 'creato_da', 'VARCHAR(100) NULL'],
+        // Testo della task. Prima stava nella prima riga di note, che ora contiene solo le note.
+        ['tasks', 'titolo', 'TEXT NULL'],
     ];
     foreach ($columns as [$table, $column, $definition]) {
         if (!hasColumn($pdo, $table, $column)) {
@@ -192,6 +194,7 @@ function bootstrapDatabase(array $config, string $markerFile): void
     ensureIndex($pdo, 'tasks', 'idx_tasks_created_at', 'created_at');
     ensureIndex($pdo, 'tasks', 'idx_tasks_utente', 'utente');
     backfillTaskCreators($pdo);
+    backfillTaskTitles($pdo);
 
     // Primo amministratore solo su installazione nuova e con password configurata.
     $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
@@ -248,6 +251,46 @@ function backfillTaskCreators(PDO $pdo): void
             : (string) $task['utente'];
         $update->execute([':creato_da' => $author, ':id' => $task['id']]);
     }
+}
+
+// Dalla vecchia struttura (attività con più righe) alla task singola: la prima riga
+// diventa il testo della task, le righe successive restano come sue note.
+function backfillTaskTitles(PDO $pdo): void
+{
+    $update = $pdo->prepare('UPDATE tasks SET titolo = :titolo, note = :note WHERE id = :id');
+    foreach ($pdo->query('SELECT id, descrizione, note FROM tasks WHERE titolo IS NULL')->fetchAll() as $task) {
+        [$title, $notes] = splitFirstNoteEntry((string) $task['note']);
+        if ($title === '') {
+            $description = trim((string) $task['descrizione']);
+            $title = $description !== '' && $description !== '-' ? $description : 'Senza titolo';
+        }
+        $update->execute([':titolo' => $title, ':note' => $notes !== '' ? $notes : null, ':id' => $task['id']]);
+    }
+}
+
+/** Separa la prima voce "[data] utente: testo" (con le sue righe di continuazione) dal resto. */
+function splitFirstNoteEntry(string $note): array
+{
+    $lines = array_values(array_filter(
+        array_map('trim', preg_split('/\R/', $note) ?: []),
+        static fn ($line) => $line !== ''
+    ));
+    if (!$lines) {
+        return ['', ''];
+    }
+
+    $first = array_shift($lines);
+    $title = $first;
+    if (preg_match('/^\[[^\]]+\]\s*(.*)$/s', $first, $match)) {
+        $payload = $match[1];
+        $separator = strpos($payload, ':');
+        $title = trim($separator === false ? $payload : substr($payload, $separator + 1));
+        while ($lines && !str_starts_with($lines[0], '[')) {
+            $title .= "\n" . array_shift($lines);
+        }
+    }
+
+    return [trim($title), implode("\n", $lines)];
 }
 
 function hasColumn(PDO $pdo, string $table, string $column): bool

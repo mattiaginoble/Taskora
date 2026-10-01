@@ -4,7 +4,7 @@ import { ApiService } from './api';
 import { InitData, NewTaskPayload, Project, Task, TaskEvent, TaskUpdatePayload } from './models';
 import { PeopleService } from './people';
 
-/** Attività, progetti e settori, caricati da api/init.php. */
+/** Task, progetti e settori, caricati da api/init.php. */
 @Injectable({ providedIn: 'root' })
 export class WorkService {
   private readonly api = inject(ApiService);
@@ -36,7 +36,7 @@ export class WorkService {
     return task;
   }
 
-  /** Eliminazione logica (solo admin): l'attività resta nel database e nel registro. */
+  /** Eliminazione logica (solo admin): la task resta nel database e nel registro. */
   async remove(id: string): Promise<void> {
     await firstValueFrom(this.api.delete('task.php', { id }));
     this.tasks.update((tasks) => tasks.filter((t) => t.id !== id));

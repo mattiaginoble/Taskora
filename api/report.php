@@ -70,6 +70,11 @@ foreach ($pdo->query('SELECT username, role FROM users ORDER BY username')->fetc
         $ensureUser($user['username']);
     }
 }
+// Prima tutti gli owner, così il lavoro che fanno sulle task degli altri conta
+// qualunque sia l'ordine delle task.
+foreach ($tasks as $task) {
+    $ensureUser((string) $task['utente']);
+}
 
 $signals = [];
 $addSignal = static function (string $type, string $severity, string $username, ?array $task, string $detail, ?string $at) use (&$signals, &$stats): void {
@@ -97,7 +102,11 @@ foreach ($tasks as $task) {
     $owner = (string) $task['utente'];
     $ensureUser($owner);
     $isOpen = $task['stato'] !== 'Completato';
+    // Lavoro registrato sulla task: la sua creazione e le note scritte dopo
     $entries = parseNoteEntries((string) ($task['note'] ?? ''));
+    if ($task['creato_da']) {
+        array_unshift($entries, ['at' => $task['created_at'], 'user' => (string) $task['creato_da']]);
+    }
 
     if ($isOpen) {
         $stats[$owner]['attivita_aperte']++;
@@ -134,9 +143,6 @@ foreach ($tasks as $task) {
     if (!$isOpen && $task['completed_at'] && $task['completed_at'] >= $since) {
         $stats[$owner]['completate_periodo']++;
         $stats[$owner]['durate'][] = (strtotime($task['completed_at']) - strtotime($task['created_at'])) / 86400;
-        if (count($entries) <= 1) {
-            $addSignal('completed_without_tasks', 'info', $owner, $task, 'Completata con una sola task registrata', $task['completed_at']);
-        }
     }
 }
 
@@ -149,15 +155,18 @@ $stmt = $pdo->prepare(
 $stmt->execute($sector !== '' ? [':since' => $since, ':settore' => $sector] : [':since' => $since]);
 $events = $stmt->fetchAll();
 
-// Task aggiunte per (attività, utente, istante): servono a capire se un salto
-// di avanzamento è accompagnato da una descrizione del lavoro.
+// Note aggiunte per (task, utente, istante): servono a capire se un salto di
+// avanzamento è accompagnato da una descrizione del lavoro. "task_added" è il
+// nome che avevano prima che le attività diventassero task singole.
 $taskAddedAt = [];
 $addedByUser = [];
 foreach ($events as $event) {
     if ($event['event_type'] === 'hours_logged' && isset($stats[$event['username']])) {
         $stats[$event['username']]['ore_periodo'] += (float) $event['new_value'];
     }
-    if ($event['event_type'] === 'task_added') {
+    // Qualsiasi modifica conta come attività del suo autore
+    $touch((string) $event['username'], $event['created_at']);
+    if (in_array($event['event_type'], ['note_added', 'task_added'], true)) {
         $taskAddedAt[$event['task_id'] . '|' . $event['username'] . '|' . $event['created_at']] = true;
         $addedByUser[$event['username']][] = $event;
     }
@@ -176,7 +185,7 @@ foreach ($events as $event) {
                 $described ? 'media' : 'alta',
                 $actor,
                 $task,
-                "Avanzamento da {$event['old_value']}% a {$event['new_value']}% in un solo aggiornamento" . ($described ? '' : ', senza nuove task'),
+                "Avanzamento da {$event['old_value']}% a {$event['new_value']}% in un solo aggiornamento" . ($described ? '' : ', senza note'),
                 $event['created_at']
             );
         }
@@ -184,13 +193,13 @@ foreach ($events as $event) {
         && (string) $event['new_value'] > (string) $event['old_value']) {
         $addSignal('due_date_postponed', 'info', (string) ($event['utente'] ?? $actor), $task, "Scadenza spostata da {$event['old_value']} a {$event['new_value']} (da {$actor})", $event['created_at']);
     } elseif ($event['event_type'] === 'history_edited') {
-        $addSignal('history_edited', 'alta', $actor, $task, 'Storico delle task riscritto', $event['created_at']);
+        $addSignal('history_edited', 'alta', $actor, $task, 'Note della task riscritte', $event['created_at']);
     } elseif ($event['event_type'] === 'deleted') {
-        $addSignal('deleted', 'media', $actor, $task, 'Attività eliminata', $event['created_at']);
+        $addSignal('deleted', 'media', $actor, $task, 'Task eliminata', $event['created_at']);
     }
 }
 
-// Molte task inserite in pochi minuti: aggiornamenti scritti tutti insieme.
+// Molte note scritte in pochi minuti: aggiornamenti scritti tutti insieme.
 foreach ($addedByUser as $username => $added) {
     $count = count($added);
     for ($start = 0; $start < $count; $start++) {
@@ -200,13 +209,13 @@ foreach ($addedByUser as $username => $added) {
         }
         $size = $end - $start + 1;
         if ($size >= BURST_COUNT) {
-            $addSignal('burst', 'info', (string) $username, null, "{$size} task inserite in meno di " . BURST_MINUTES . ' minuti', $added[$start]['created_at']);
+            $addSignal('burst', 'info', (string) $username, null, "{$size} note scritte in meno di " . BURST_MINUTES . ' minuti', $added[$start]['created_at']);
             $start = $end;
         }
     }
 }
 
-// Dipendenti con attività aperte ma senza aggiornamenti recenti.
+// Dipendenti con task aperte ma senza aggiornamenti recenti.
 foreach ($stats as $username => $userStats) {
     $last = $userStats['ultimo_aggiornamento'];
     if ($userStats['attivita_aperte'] > 0 && ($last === null || daysBetween($last, $nowTs) >= STALE_DAYS)) {
@@ -215,7 +224,7 @@ foreach ($stats as $username => $userStats) {
             'alta',
             $username,
             null,
-            $last === null ? 'Nessuna task mai inserita' : 'Nessuna task inserita da ' . daysBetween($last, $nowTs) . ' giorni',
+            $last === null ? 'Nessun aggiornamento registrato' : 'Nessun aggiornamento da ' . daysBetween($last, $nowTs) . ' giorni',
             $last
         );
     }

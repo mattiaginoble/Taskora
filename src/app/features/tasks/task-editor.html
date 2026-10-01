@@ -1,0 +1,181 @@
+<div class="editor">
+  <section class="head">
+    <div class="badges">
+      <app-status-badge [status]="task().stato" />
+      <app-priority-badge [priority]="task().priorita" />
+    </div>
+    <p class="title">{{ task().titolo }}</p>
+    <app-schedule-bar class="bar" [task]="task()" />
+    <dl class="meta">
+      <div>
+        <dt>Owner del task</dt>
+        <dd>{{ owner() }}</dd>
+      </div>
+      <div>
+        <dt>Assegnato da</dt>
+        <dd>{{ assignedBy() }}</dd>
+      </div>
+      <div>
+        <dt>Scadenza</dt>
+        <dd>{{ formatDate(task().scadenza) }}</dd>
+      </div>
+      <div>
+        <dt>Ore registrate</dt>
+        <dd>{{ hours() }}</dd>
+      </div>
+      <div>
+        <dt>Creata il</dt>
+        <dd>{{ created() }}</dd>
+      </div>
+      <div>
+        <dt>Ultimo aggiornamento</dt>
+        <dd>{{ lastUpdate() }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <form class="form-stack" (ngSubmit)="save()">
+    @if (session.isAdmin()) {
+      <label class="field">
+        <span>Task</span>
+        <textarea name="titolo" rows="2" [(ngModel)]="titolo" required></textarea>
+      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span>Owner del task</span>
+          <select name="utente" [(ngModel)]="utente">
+            @for (person of people.list(); track person.username) {
+              <option [value]="person.username">{{ person.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span>Progetto</span>
+          <input
+            name="progetto"
+            list="task-editor-projects"
+            autocomplete="off"
+            [(ngModel)]="progetto"
+            required
+          />
+          <datalist id="task-editor-projects">
+            @for (project of work.projects(); track project.id) {
+              <option [value]="project.nome"></option>
+            }
+          </datalist>
+        </label>
+        <label class="field">
+          <span>Settore</span>
+          <select name="settore" [(ngModel)]="settore">
+            @if (!settore) {
+              <option value="">Scegli il settore</option>
+            }
+            @for (sector of work.sectors(); track sector) {
+              <option [value]="sector">{{ sector }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span>Scadenza</span>
+          <input name="scadenza" type="date" [(ngModel)]="scadenza" />
+        </label>
+        <label class="field">
+          <span>Priorità</span>
+          <select name="priorita" [(ngModel)]="priorita">
+            @for (priority of priorities; track priority) {
+              <option [value]="priority">{{ priority }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span>Stato</span>
+          <select name="stato" [(ngModel)]="stato">
+            @for (status of statuses; track status) {
+              <option [value]="status">{{ status }}</option>
+            }
+          </select>
+        </label>
+      </div>
+    } @else {
+      <label class="field">
+        <span>Stato</span>
+        <select name="stato" [(ngModel)]="stato">
+          @for (status of statuses; track status) {
+            <option [value]="status">{{ status }}</option>
+          }
+        </select>
+      </label>
+    }
+
+    <label class="field">
+      <span
+        >Avanzamento <strong>{{ avanzamento }}%</strong></span
+      >
+      <input name="avanzamento" type="range" min="0" max="100" step="5" [(ngModel)]="avanzamento" />
+    </label>
+    <div class="form-grid">
+      <label class="field wide">
+        <span>Nuova nota <small>(facoltativa)</small></span>
+        <textarea name="nota" rows="2" placeholder="Cosa hai fatto?" [(ngModel)]="nota"></textarea>
+      </label>
+      <label class="field">
+        <span>Ore lavorate <small>(si sommano)</small></span>
+        <input
+          name="ore"
+          type="number"
+          min="0.25"
+          max="24"
+          step="0.25"
+          inputmode="decimal"
+          placeholder="es. 1,5"
+          [(ngModel)]="ore"
+        />
+      </label>
+    </div>
+
+    <div class="actions">
+      @if (session.isAdmin()) {
+        <button type="button" class="btn btn-danger" [disabled]="saving()" (click)="remove()">
+          {{ confirmDelete() ? 'Conferma eliminazione' : 'Elimina task' }}
+        </button>
+        @if (confirmDelete()) {
+          <button type="button" class="btn" (click)="confirmDelete.set(false)">Annulla</button>
+        }
+      }
+      <button type="submit" class="btn btn-primary save" [disabled]="saving()">
+        {{ saving() ? 'Salvataggio...' : 'Salva' }}
+      </button>
+    </div>
+  </form>
+
+  <section class="notes">
+    <h4>Note</h4>
+    @if (notes().length === 0) {
+      <p class="muted">Nessuna nota.</p>
+    } @else {
+      <ul class="entry-list">
+        @for (entry of notes(); track $index) {
+          <li class="entry">
+            <p class="entry-meta">{{ entry.author ? entry.author + ' - ' : '' }}{{ entry.date }}</p>
+            <p class="entry-text">{{ entry.message || '-' }}</p>
+          </li>
+        }
+      </ul>
+    }
+    @if (session.isAdmin()) {
+      @if (notes().length > 0) {
+        <details class="rewrite">
+          <summary>Correggi le note</summary>
+          <p class="notice warning">
+            La correzione resta nel registro modifiche e compare tra i segnali del riepilogo.
+          </p>
+          <label class="field">
+            <span class="visually-hidden">Note della task</span>
+            <textarea name="storico" rows="5" [(ngModel)]="storico"></textarea>
+          </label>
+        </details>
+      }
+      <app-event-log [taskIds]="[task().id]" [version]="task().updated_at" />
+    }
+  </section>
+</div>

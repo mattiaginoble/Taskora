@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TASK_PRIORITIES, TASK_STATUSES, TaskPriority, TaskStatus } from '../../core/models';
+import { TASK_PRIORITIES, TASK_STATUSES, Task, TaskPriority, TaskStatus } from '../../core/models';
 import { PeopleService } from '../../core/people';
 import { SessionService } from '../../core/session';
 import { addDaysIso, todayIso } from '../../core/task-utils';
@@ -9,13 +9,13 @@ import { WorkService } from '../../core/work';
 import { Dialog } from '../../shared/dialog';
 
 /**
- * Nuova attività: progetto, settore, prima task e (per gli admin) owner e campi riservati.
- * "Assegnato da" non si sceglie: è chi crea l'attività.
+ * Nuova task: testo, progetto, settore, scadenza e (per gli admin) owner, priorità,
+ * stato e avanzamento. "Assegnato da" non si sceglie: è chi crea la task.
  */
 @Component({
-  selector: 'app-new-activity',
+  selector: 'app-new-task',
   imports: [Dialog, FormsModule],
-  templateUrl: './new-activity.html',
+  templateUrl: './new-task.html',
   styles: `
     .chips {
       display: flex;
@@ -43,24 +43,28 @@ import { Dialog } from '../../shared/dialog';
     }
   `,
 })
-export class NewActivity implements OnInit {
+export class NewTask implements OnInit {
   protected readonly work = inject(WorkService);
   protected readonly session = inject(SessionService);
   protected readonly people = inject(PeopleService);
   private readonly toast = inject(ToastService);
 
-  /** Settore preselezionato (quello della scheda aperta). */
+  /** Valori proposti (es. aprendo da un progetto o da una scheda di settore). */
   readonly sector = input('');
+  readonly project = input('');
+  readonly owner = input('');
   readonly closed = output<void>();
+  /** La task appena creata. */
+  readonly created = output<Task>();
 
   protected readonly statuses = TASK_STATUSES;
   protected readonly priorities = TASK_PRIORITIES;
   protected readonly today = todayIso();
 
+  protected titolo = '';
   protected utente = '';
   protected progetto = '';
   protected settore = '';
-  protected note = '';
   protected scadenza = '';
   protected ore: number | null = null;
   protected priorita: TaskPriority = 'Media';
@@ -70,8 +74,9 @@ export class NewActivity implements OnInit {
 
   ngOnInit(): void {
     if (this.work.sectors().includes(this.sector())) this.settore = this.sector();
-    // Di partenza l'attività è di chi la crea; l'admin può assegnarla a un altro
-    this.utente = this.session.user()?.username ?? '';
+    this.progetto = this.project();
+    // Di partenza la task è di chi la crea; l'admin può assegnarla a un altro
+    this.utente = this.owner() || this.session.user()?.username || '';
   }
 
   protected setDue(days: number): void {
@@ -79,16 +84,16 @@ export class NewActivity implements OnInit {
   }
 
   protected async save(): Promise<void> {
-    if (!this.note.trim()) {
-      this.toast.show('Inserisci la task', true);
+    if (!this.titolo.trim()) {
+      this.toast.show('Scrivi il testo della task', true);
       return;
     }
     this.saving.set(true);
     try {
-      await this.work.create({
+      const task = await this.work.create({
+        titolo: this.titolo.trim(),
         progetto: this.progetto.trim(),
         settore: this.settore,
-        note: this.note.trim(),
         scadenza: this.scadenza || todayIso(),
         ore: this.ore ? String(this.ore) : '',
         // I campi riservati vengono comunque ignorati dal server per i dipendenti
@@ -101,7 +106,8 @@ export class NewActivity implements OnInit {
             }
           : {}),
       });
-      this.toast.show('Attività creata');
+      this.toast.show('Task creata');
+      this.created.emit(task);
       this.closed.emit();
     } catch (error) {
       this.toast.error(error);

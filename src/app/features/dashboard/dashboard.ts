@@ -6,11 +6,11 @@ import { SessionService } from '../../core/session';
 import { ProjectSummary, groupByProject, sortTasks } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
 import { WorkService } from '../../core/work';
-import { NewActivity } from './new-activity';
+import { NewTask } from '../tasks/new-task';
 import { ProjectCard } from './project-card';
 import { ProjectDetail } from './project-detail';
 
-/** Scheda "Senza settore": attività create prima che il settore fosse obbligatorio. */
+/** Scheda "Senza settore": task create prima che il settore fosse obbligatorio. */
 const NO_SECTOR = '__none__';
 
 interface EmployeeColumn {
@@ -22,7 +22,7 @@ interface EmployeeColumn {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [ProjectCard, ProjectDetail, NewActivity],
+  imports: [ProjectCard, ProjectDetail, NewTask],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -42,8 +42,8 @@ export class DashboardPage {
   protected readonly selectedProject = signal('');
   protected readonly collapsed = signal(new Set<string>());
   protected readonly creating = signal(false);
-  /** Attività del progetto aperto nel dettaglio (per id, così si aggiornano dopo un salvataggio). */
-  private readonly openIds = signal<string[] | null>(null);
+  /** Progetto aperto nel dettaglio: owner (colonna) e nome del progetto. */
+  private readonly openProjectKey = signal<{ owner: string; project: string } | null>(null);
 
   /** Scheda scelta: parte dall'indirizzo ma si può cambiare dalla pagina. */
   protected readonly selectedSector = linkedSignal(() => this.settore() ?? '');
@@ -51,7 +51,7 @@ export class DashboardPage {
     this.session.isAdmin() ? 'Cerca progetto o dipendente' : 'Cerca progetto',
   );
 
-  /** Attività filtrate da ricerca, completate e progetto (non dal settore). */
+  /** Task filtrate da ricerca, completate e progetto (non dal settore). */
   private readonly baseTasks = computed(() => {
     const query = this.search().trim().toLowerCase();
     return sortTasks(this.work.tasks()).filter((task) => {
@@ -64,6 +64,7 @@ export class DashboardPage {
         task.progetto,
         task.creato_da,
         this.people.name(task.creato_da),
+        task.titolo,
         task.priorita,
       ].some((value) =>
         String(value ?? '')
@@ -95,7 +96,7 @@ export class DashboardPage {
     return tabs;
   });
 
-  /** Una colonna per dipendente (titolare dell'attività), in ordine di nome. */
+  /** Una colonna per persona (owner delle task), in ordine di nome. */
   protected readonly columns = computed<EmployeeColumn[]>(() => {
     const sector = this.selectedSector();
     const tasks = sector
@@ -127,9 +128,17 @@ export class DashboardPage {
     return `${projects} ${projects === 1 ? 'progetto' : 'progetti'}${inProgress ? ` · ${inProgress} in corso` : ''}`;
   });
 
+  /** Task del progetto aperto, sempre aggiornate (nuove, modificate, eliminate). */
   protected readonly openRecords = computed(() => {
-    const ids = this.openIds();
-    return ids ? this.work.tasks().filter((t) => ids.includes(t.id)) : [];
+    const key = this.openProjectKey();
+    if (!key) return [];
+    return this.work.tasks().filter(
+      (t) =>
+        (t.utente || 'Sconosciuto') === key.owner &&
+        String(t.progetto ?? '')
+          .trim()
+          .toLowerCase() === key.project,
+    );
   });
 
   constructor() {
@@ -156,12 +165,12 @@ export class DashboardPage {
     });
   }
 
-  protected openProject(project: ProjectSummary): void {
-    this.openIds.set(project.records.map((r) => r.id));
+  protected openProject(owner: string, project: ProjectSummary): void {
+    this.openProjectKey.set({ owner, project: project.key });
   }
 
   protected closeProject(): void {
-    this.openIds.set(null);
+    this.openProjectKey.set(null);
   }
 
   protected avatar(name: string): string {
