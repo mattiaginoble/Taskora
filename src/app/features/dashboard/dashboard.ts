@@ -165,6 +165,17 @@ export class DashboardPage {
     });
   }
 
+  protected readonly allCollapsed = computed(() => {
+    const columns = this.columns();
+    return columns.length > 0 && columns.every((c) => this.collapsed().has(c.username));
+  });
+
+  protected toggleAllColumns(): void {
+    this.collapsed.set(
+      this.allCollapsed() ? new Set() : new Set(this.columns().map((c) => c.username)),
+    );
+  }
+
   protected openProject(owner: string, project: ProjectSummary): void {
     this.openProjectKey.set({ owner, project: project.key });
   }

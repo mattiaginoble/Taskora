@@ -21,6 +21,11 @@
       >
         {{ showCompleted() ? 'Nascondi completate' : 'Mostra completate' }}
       </button>
+      @if (columns().length > 1) {
+        <button type="button" class="btn" (click)="toggleAllColumns()">
+          {{ allCollapsed() ? 'Espandi tutti' : 'Comprimi tutti' }}
+        </button>
+      }
       @if (selectedProject()) {
         <button type="button" class="btn" (click)="selectedProject.set('')">
           Tutti i progetti ({{ selectedProject() }})
