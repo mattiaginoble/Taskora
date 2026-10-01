@@ -7,50 +7,54 @@
   </div>
 
   <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Utenti</h2>
+        <p class="muted small">
+          {{
+            users().length === totalUsers()
+              ? totalUsers() + ' utenti'
+              : users().length + ' di ' + totalUsers() + ' utenti'
+          }}
+        </p>
+      </div>
+      <button type="button" class="btn btn-primary" (click)="openCreateUser()">Nuovo utente</button>
+    </div>
     <div>
-      <h2>Utenti</h2>
       <p class="muted small">
         Il nome visualizzato compare in tutta l'app; il nome utente serve solo per accedere. Chi
         riceve una password da qui deve cambiarla al primo accesso.
       </p>
     </div>
-    <form class="inline-form" (ngSubmit)="createUser()">
-      <label class="field">
-        <span>Nome visualizzato</span>
-        <input name="newName" maxlength="100" placeholder="es. Mario Rossi" [(ngModel)]="newName" />
-      </label>
-      <label class="field">
-        <span>Nome utente (accesso)</span>
+    <div class="filters">
+      <label class="field grow">
+        <span>Cerca</span>
         <input
-          name="newUsername"
-          required
-          pattern="[A-Za-z0-9._\-]{3,50}"
-          autocomplete="off"
-          [(ngModel)]="newUsername"
+          type="search"
+          placeholder="Nome o nome utente"
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
         />
       </label>
       <label class="field">
         <span>Ruolo</span>
-        <select name="newRole" [(ngModel)]="newRole">
-          <option value="user">Dipendente</option>
-          <option value="administrator">Amministratore</option>
+        <select [value]="roleFilter()" (change)="roleFilter.set($any($event.target).value)">
+          <option value="">Tutti</option>
+          <option value="user">Dipendenti</option>
+          <option value="administrator">Amministratori</option>
         </select>
       </label>
       <label class="field">
-        <span>Password temporanea</span>
-        <input
-          name="newPassword"
-          required
-          minlength="8"
-          autocomplete="off"
-          [(ngModel)]="newPassword"
-        />
+        <span>Password</span>
+        <select [value]="passwordFilter()" (change)="passwordFilter.set($any($event.target).value)">
+          <option value="">Tutte</option>
+          <option value="pending">Da cambiare</option>
+          <option value="set">Impostata</option>
+        </select>
       </label>
-      <button type="button" class="btn" (click)="generate()">Genera</button>
-      <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea utente</button>
-    </form>
+    </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap scroll-table">
       <table class="data">
         <thead>
           <tr>
@@ -109,7 +113,13 @@
           } @empty {
             <tr>
               <td colspan="6" class="empty">
-                {{ loading() ? 'Caricamento...' : 'Nessun utente' }}
+                {{
+                  loading()
+                    ? 'Caricamento...'
+                    : totalUsers()
+                      ? 'Nessun utente per i filtri scelti'
+                      : 'Nessun utente'
+                }}
               </td>
             </tr>
           }
@@ -131,7 +141,7 @@
         </label>
         <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea settore</button>
       </form>
-      <div class="table-wrap">
+      <div class="table-wrap scroll-table">
         <table class="data">
           <thead>
             <tr>
@@ -171,7 +181,7 @@
         </label>
         <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea progetto</button>
       </form>
-      <div class="table-wrap">
+      <div class="table-wrap scroll-table">
         <table class="data">
           <thead>
             <tr>
@@ -219,6 +229,48 @@
         />
       </label>
       <button type="submit" class="btn btn-primary" [disabled]="busy()">Reimposta</button>
+    </form>
+  </app-dialog>
+}
+
+@if (creatingUser()) {
+  <app-dialog title="Nuovo utente" size="sm" (closed)="creatingUser.set(false)">
+    <form class="form-stack" (ngSubmit)="createUser()">
+      <label class="field">
+        <span>Nome visualizzato</span>
+        <input name="newName" maxlength="100" placeholder="es. Mario Rossi" [(ngModel)]="newName" />
+      </label>
+      <label class="field">
+        <span>Nome utente (accesso)</span>
+        <input
+          name="newUsername"
+          required
+          pattern="[A-Za-z0-9._\-]{3,50}"
+          autocomplete="off"
+          [(ngModel)]="newUsername"
+        />
+      </label>
+      <label class="field">
+        <span>Ruolo</span>
+        <select name="newRole" [(ngModel)]="newRole">
+          <option value="user">Dipendente</option>
+          <option value="administrator">Amministratore</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Password temporanea</span>
+        <input
+          name="newPassword"
+          required
+          minlength="8"
+          autocomplete="off"
+          [(ngModel)]="newPassword"
+        />
+      </label>
+      <div class="password-row">
+        <button type="button" class="btn" (click)="generate()">Genera nuova password</button>
+        <button type="submit" class="btn btn-primary" [disabled]="busy()">Crea utente</button>
+      </div>
     </form>
   </app-dialog>
 }
