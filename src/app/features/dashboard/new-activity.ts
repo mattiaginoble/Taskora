@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TASK_PRIORITIES, TASK_STATUSES, TaskPriority, TaskStatus } from '../../core/models';
+import { PeopleService } from '../../core/people';
 import { SessionService } from '../../core/session';
 import { addDaysIso, todayIso } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
@@ -42,6 +43,7 @@ import { Dialog } from '../../shared/dialog';
 export class NewActivity implements OnInit {
   protected readonly work = inject(WorkService);
   protected readonly session = inject(SessionService);
+  protected readonly people = inject(PeopleService);
   private readonly toast = inject(ToastService);
 
   /** Settore preselezionato (quello della scheda aperta). */
@@ -52,6 +54,7 @@ export class NewActivity implements OnInit {
   protected readonly priorities = TASK_PRIORITIES;
   protected readonly today = todayIso();
 
+  protected utente = '';
   protected progetto = '';
   protected settore = '';
   protected note = '';
@@ -65,6 +68,8 @@ export class NewActivity implements OnInit {
 
   ngOnInit(): void {
     if (this.work.sectors().includes(this.sector())) this.settore = this.sector();
+    // Di partenza l'attività è di chi la crea; l'admin può assegnarla a un altro
+    this.utente = this.session.user()?.username ?? '';
   }
 
   protected setDue(days: number): void {
@@ -87,6 +92,7 @@ export class NewActivity implements OnInit {
         // I campi riservati vengono comunque ignorati dal server per i dipendenti
         ...(this.session.isAdmin()
           ? {
+              utente: this.utente,
               assegnato_a: this.assegnato,
               priorita: this.priorita,
               stato: this.stato,

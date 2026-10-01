@@ -7,6 +7,14 @@
   <div class="editor">
     <form class="form-stack" id="activity-form" (ngSubmit)="save()">
       <div class="form-grid">
+        <label class="field wide">
+          <span>Dipendente</span>
+          <select name="utente" [(ngModel)]="utente">
+            @for (person of people.list(); track person.username) {
+              <option [value]="person.username">{{ person.name }}</option>
+            }
+          </select>
+        </label>
         <label class="field">
           <span>Progetto</span>
           <input

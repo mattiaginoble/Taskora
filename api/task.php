@@ -14,7 +14,7 @@ $isAdmin = isAdministrator($sessionUser);
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Campi confrontati per il registro eventi quando un'attività viene modificata.
-const TRACKED_FIELDS = ['progetto', 'descrizione', 'scadenza', 'assegnato_a', 'priorita', 'settore', 'stato', 'avanzamento'];
+const TRACKED_FIELDS = ['utente', 'progetto', 'descrizione', 'scadenza', 'assegnato_a', 'priorita', 'settore', 'stato', 'avanzamento'];
 
 function normalizeMilestoneText(string $value): string
 {
@@ -71,6 +71,19 @@ function resolveProjectName(PDO $pdo, string $name): string
     }
 
     return (string) $project;
+}
+
+// Titolare dell'attività scelto da un admin: deve essere un utente esistente.
+function validateTaskOwner(PDO $pdo, string $username): string
+{
+    $stmt = $pdo->prepare('SELECT username FROM users WHERE LOWER(username) = LOWER(:username) LIMIT 1');
+    $stmt->execute([':username' => trim($username)]);
+    $owner = $stmt->fetchColumn();
+    if ($owner === false) {
+        jsonResponse(['success' => false, 'error' => 'Il dipendente selezionato non esiste'], 422);
+    }
+
+    return (string) $owner;
 }
 
 function validateAssignee(PDO $pdo, string $assignee): string
@@ -202,13 +215,7 @@ if ($method === 'POST') {
 
     $taskUser = $currentUser;
     if ($isAdmin && isset($input['utente']) && trim((string) $input['utente']) !== '') {
-        $requestedUser = trim((string) $input['utente']);
-        $userStmt = $pdo->prepare('SELECT id FROM users WHERE username = :username LIMIT 1');
-        $userStmt->execute([':username' => $requestedUser]);
-        if (!$userStmt->fetch()) {
-            jsonResponse(['success' => false, 'error' => 'L\'utente selezionato non esiste'], 422);
-        }
-        $taskUser = $requestedUser;
+        $taskUser = validateTaskOwner($pdo, (string) $input['utente']);
     }
 
     $progetto = resolveProjectName($pdo, (string) ($input['progetto'] ?? ''));
@@ -321,6 +328,9 @@ if ($method === 'PUT') {
 
     // Campi riservati agli admin; per i dipendenti vengono ignorati.
     if ($isAdmin) {
+        if (isset($input['utente']) && trim((string) $input['utente']) !== '') {
+            $updated['utente'] = validateTaskOwner($pdo, (string) $input['utente']);
+        }
         if (array_key_exists('progetto', $input)) {
             $updated['progetto'] = resolveProjectName($pdo, (string) $input['progetto']);
         }
@@ -370,12 +380,13 @@ if ($method === 'PUT') {
     $updated['updated_at'] = $now;
 
     $pdo->prepare(
-        'UPDATE tasks SET progetto = :progetto, descrizione = :descrizione, scadenza = :scadenza,
+        'UPDATE tasks SET utente = :utente, progetto = :progetto, descrizione = :descrizione, scadenza = :scadenza,
          assegnato_a = :assegnato_a, priorita = :priorita, settore = :settore, note = :note, stato = :stato,
          avanzamento = :avanzamento, ore_lavorate = :ore_lavorate, started_at = :started_at, completed_at = :completed_at, updated_at = :updated_at
          WHERE id = :id'
     )->execute([
         ':id' => $taskId,
+        ':utente' => $updated['utente'],
         ':progetto' => $updated['progetto'],
         ':descrizione' => $updated['descrizione'],
         ':scadenza' => $updated['scadenza'],

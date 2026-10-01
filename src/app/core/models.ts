@@ -74,6 +74,8 @@ export interface TaskEvent {
 
 /** Dati per creare un'attività (POST api/task.php). */
 export interface NewTaskPayload {
+  /** Titolare dell'attività (solo admin; per i dipendenti è sempre chi la crea). */
+  utente?: string;
   progetto: string;
   settore: string;
   note: string;
@@ -92,6 +94,7 @@ export interface NewTaskPayload {
  */
 export interface TaskUpdatePayload {
   id: string;
+  utente?: string;
   stato?: TaskStatus;
   avanzamento?: number;
   note_append?: string;

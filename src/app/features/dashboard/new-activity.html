@@ -1,5 +1,15 @@
 <app-dialog title="Nuova attività" (closed)="closed.emit()">
   <form class="form-grid" (ngSubmit)="save()">
+    @if (session.isAdmin()) {
+      <label class="field wide">
+        <span>Dipendente <small>(chi deve svolgere l'attività)</small></span>
+        <select name="utente" [(ngModel)]="utente" required>
+          @for (person of people.list(); track person.username) {
+            <option [value]="person.username">{{ person.name }}</option>
+          }
+        </select>
+      </label>
+    }
     <label class="field">
       <span>Progetto</span>
       <input
