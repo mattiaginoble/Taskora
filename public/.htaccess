@@ -3,7 +3,8 @@
 # dentro una sottocartella senza regole di riscrittura per le sue pagine.
 
 # Indirizzi della versione precedente (segnalibri, pagine rimaste nella cache
-# del browser): portano alla pagina corrispondente della nuova app.
+# del browser): portano alla pagina corrispondente della nuova app. Se il
+# server ignora queste regole, lo fanno le pagine omonime in questa cartella.
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteCond %{REQUEST_URI} ^(.*/)(dashboard-inprogress|home)\.html$
@@ -14,9 +15,9 @@
   RewriteRule ^ %1#/%2 [R=302,NE,L]
 </IfModule>
 
-# index.html sempre aggiornato; i file con l'hash nel nome possono restare in cache
+# Pagine HTML sempre aggiornate; i file con l'hash nel nome possono restare in cache
 <IfModule mod_headers.c>
-  <FilesMatch "index\.html$">
+  <FilesMatch "\.html$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>
