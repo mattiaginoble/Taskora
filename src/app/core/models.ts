@@ -14,10 +14,14 @@ export const TASK_PRIORITIES: readonly TaskPriority[] = ['Bassa', 'Media', 'Alta
 /** Un'attività (riga della tabella `tasks`). Le task sono le righe del campo `note`. */
 export interface Task {
   id: string;
+  /** Owner del task: chi deve svolgere l'attività. */
   utente: string;
+  /** "Assegnato da": chi ha creato l'attività, impostato dal server. */
+  creato_da: string | null;
   progetto: string;
   descrizione: string;
   scadenza: string;
+  /** Vecchio "responsabile" scelto a mano: resta nei dati ma non si usa più. */
   assegnato_a: string | null;
   priorita: TaskPriority;
   settore: string | null;
@@ -38,12 +42,6 @@ export interface SessionUser {
   display_name: string;
 }
 
-export interface AdminUser {
-  id: number;
-  username: string;
-  display_name: string;
-}
-
 export interface Project {
   id: number;
   nome: string;
@@ -51,7 +49,6 @@ export interface Project {
 
 export interface InitData {
   user: SessionUser;
-  users: AdminUser[];
   projects: Project[];
   sectors: string[];
   people: Record<string, string>;
@@ -74,14 +71,13 @@ export interface TaskEvent {
 
 /** Dati per creare un'attività (POST api/task.php). */
 export interface NewTaskPayload {
-  /** Titolare dell'attività (solo admin; per i dipendenti è sempre chi la crea). */
+  /** Owner del task (solo admin; per i dipendenti è sempre chi la crea). */
   utente?: string;
   progetto: string;
   settore: string;
   note: string;
   scadenza: string;
   ore?: string;
-  assegnato_a?: string;
   priorita?: TaskPriority;
   stato?: TaskStatus;
   avanzamento?: number;
@@ -102,7 +98,6 @@ export interface TaskUpdatePayload {
   progetto?: string;
   settore?: string;
   scadenza?: string;
-  assegnato_a?: string;
   priorita?: TaskPriority;
   /** Riscrive lo storico delle task: finisce nel registro come modifica sospetta. */
   note?: string;

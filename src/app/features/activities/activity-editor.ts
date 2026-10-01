@@ -40,10 +40,12 @@ export class ActivityEditor implements OnInit {
   protected readonly eyebrow = computed(() => {
     const task = this.task();
     return [
-      this.people.name(task.utente),
-      `creata il ${formatDateTime(task.created_at)}`,
+      task.creato_da ? `assegnata da ${this.people.name(task.creato_da)}` : '',
+      `il ${formatDateTime(task.created_at)}`,
       `ore registrate: ${formatHours(task.ore_lavorate)}`,
-    ].join(' · ');
+    ]
+      .filter(Boolean)
+      .join(' · ');
   });
   protected readonly entries = computed(() =>
     parseTaskEntries(this.task().note)
@@ -54,7 +56,6 @@ export class ActivityEditor implements OnInit {
   protected utente = '';
   protected progetto = '';
   protected settore = '';
-  protected assegnato = '';
   protected priorita: TaskPriority = 'Media';
   protected scadenza = '';
   protected stato: TaskStatus = 'Da fare';
@@ -71,7 +72,6 @@ export class ActivityEditor implements OnInit {
     this.utente = task.utente;
     this.progetto = task.progetto;
     this.settore = task.settore ?? '';
-    this.assegnato = task.assegnato_a ?? '';
     this.priorita = task.priorita;
     this.scadenza = task.scadenza ?? '';
     this.stato = task.stato;
@@ -86,7 +86,6 @@ export class ActivityEditor implements OnInit {
     if (this.utente && this.utente !== task.utente) payload.utente = this.utente;
     if (this.progetto.trim() !== task.progetto) payload.progetto = this.progetto.trim();
     if (this.settore !== (task.settore ?? '')) payload.settore = this.settore;
-    if (this.assegnato !== (task.assegnato_a ?? '')) payload.assegnato_a = this.assegnato;
     if (this.priorita !== task.priorita) payload.priorita = this.priorita;
     if (this.scadenza !== (task.scadenza ?? '')) payload.scadenza = this.scadenza;
     if (this.stato !== task.stato) payload.stato = this.stato;

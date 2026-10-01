@@ -26,7 +26,7 @@
         <span>Cerca</span>
         <input
           type="search"
-          placeholder="Dipendente, progetto, task"
+          placeholder="Persona, progetto, task"
           [value]="query()"
           (input)="query.set($any($event.target).value)"
         />
@@ -89,7 +89,17 @@
                 [class.active]="sort().field === 'utente'"
                 (click)="sortBy('utente')"
               >
-                Dipendente <span aria-hidden="true">{{ sortIcon('utente') }}</span>
+                Owner <span aria-hidden="true">{{ sortIcon('utente') }}</span>
+              </button>
+            </th>
+            <th>
+              <button
+                type="button"
+                class="sort"
+                [class.active]="sort().field === 'creato_da'"
+                (click)="sortBy('creato_da')"
+              >
+                Assegnato da <span aria-hidden="true">{{ sortIcon('creato_da') }}</span>
               </button>
             </th>
             <th>
@@ -178,6 +188,7 @@
                 }
               </td>
               <td class="nowrap">{{ row.employee }}</td>
+              <td class="nowrap">{{ row.assignedBy }}</td>
               <td class="strong">{{ row.task.progetto }}</td>
               <td class="nowrap">{{ row.task.settore || '-' }}</td>
               <td class="task" [title]="row.lastTask">{{ row.lastTask }}</td>
@@ -188,7 +199,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="9" class="empty">
+              <td colspan="10" class="empty">
                 {{
                   loading()
                     ? 'Caricamento...'

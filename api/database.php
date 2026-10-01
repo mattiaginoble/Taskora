@@ -6,13 +6,13 @@ date_default_timezone_set('Europe/Rome');
 
 // Versione dello schema: aumentarla quando si aggiunge una migrazione in
 // bootstrapDatabase(), così viene eseguita una sola volta.
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const TASK_STATUSES = ['Da fare', 'In corso', 'Completato', 'Bloccato'];
 const TASK_PRIORITIES = ['Bassa', 'Media', 'Alta'];
 // Settori creati alla prima installazione; gli admin ne aggiungono altri dal web.
 const DEFAULT_SECTORS = ['IT', 'Commerciale', 'Logistica', 'Scansioni'];
-const TASK_COLUMNS = 'id, utente, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at';
+const TASK_COLUMNS = 'id, utente, creato_da, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at';
 
 function getAppConfig(): array
 {
@@ -178,6 +178,9 @@ function bootstrapDatabase(array $config, string $markerFile): void
         ['tasks', 'updated_at', 'DATETIME NULL'],
         ['tasks', 'deleted_at', 'DATETIME NULL'],
         ['tasks', 'deleted_by', 'VARCHAR(100) NULL'],
+        // Chi ha creato e assegnato l'attività ("Assegnato da"). La vecchia colonna
+        // assegnato_a (il "responsabile" scelto a mano) resta nel database ma non si usa più.
+        ['tasks', 'creato_da', 'VARCHAR(100) NULL'],
     ];
     foreach ($columns as [$table, $column, $definition]) {
         if (!hasColumn($pdo, $table, $column)) {
@@ -188,6 +191,7 @@ function bootstrapDatabase(array $config, string $markerFile): void
     ensureIndex($pdo, 'tasks', 'idx_tasks_assegnato_a', 'assegnato_a');
     ensureIndex($pdo, 'tasks', 'idx_tasks_created_at', 'created_at');
     ensureIndex($pdo, 'tasks', 'idx_tasks_utente', 'utente');
+    backfillTaskCreators($pdo);
 
     // Primo amministratore solo su installazione nuova e con password configurata.
     $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
@@ -223,6 +227,27 @@ function bootstrapDatabase(array $config, string $markerFile): void
     }
 
     file_put_contents($markerFile, date('c'));
+}
+
+// Autore delle attività create prima della colonna creato_da: l'evento "created"
+// del registro oppure, per quelle ancora più vecchie, chi ha scritto la prima task.
+function backfillTaskCreators(PDO $pdo): void
+{
+    $pdo->exec(
+        "UPDATE tasks t SET t.creato_da = (
+            SELECT e.username FROM task_events e
+            WHERE e.task_id = t.id AND e.event_type = 'created'
+            ORDER BY e.id ASC LIMIT 1
+        ) WHERE t.creato_da IS NULL"
+    );
+
+    $update = $pdo->prepare('UPDATE tasks SET creato_da = :creato_da WHERE id = :id');
+    foreach ($pdo->query('SELECT id, utente, note FROM tasks WHERE creato_da IS NULL')->fetchAll() as $task) {
+        $author = preg_match('/^\[[^\]]+\]\s*([^:\n]+):/m', (string) $task['note'], $match)
+            ? trim($match[1])
+            : (string) $task['utente'];
+        $update->execute([':creato_da' => $author, ':id' => $task['id']]);
+    }
 }
 
 function hasColumn(PDO $pdo, string $table, string $column): bool

@@ -19,7 +19,7 @@ import { Dialog } from '../../shared/dialog';
 import { ScheduleBar } from '../../shared/schedule-bar';
 
 const FIELD_LABELS: Record<string, string> = {
-  utente: 'dipendente',
+  utente: 'owner del task',
   progetto: 'progetto',
   descrizione: 'descrizione',
   scadenza: 'scadenza',
@@ -63,8 +63,8 @@ export class ProjectDetail {
   protected readonly employees = computed(
     () => this.people.names(this.records().map((r) => r.utente)) || '-',
   );
-  protected readonly managers = computed(
-    () => this.people.names(this.records().map((r) => r.assegnato_a)) || 'Nessuno',
+  protected readonly assignedBy = computed(
+    () => this.people.names(this.records().map((r) => r.creato_da)) || '-',
   );
   protected readonly hours = computed(() => formatHours(this.summary().ore_lavorate));
   protected readonly lastUpdate = computed(() => formatDateTime(this.summary().updated_at));

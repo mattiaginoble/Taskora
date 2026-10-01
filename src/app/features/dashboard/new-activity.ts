@@ -8,7 +8,10 @@ import { ToastService } from '../../core/toast';
 import { WorkService } from '../../core/work';
 import { Dialog } from '../../shared/dialog';
 
-/** Nuova attività: progetto, settore, prima task e (per gli admin) i campi riservati. */
+/**
+ * Nuova attività: progetto, settore, prima task e (per gli admin) owner e campi riservati.
+ * "Assegnato da" non si sceglie: è chi crea l'attività.
+ */
 @Component({
   selector: 'app-new-activity',
   imports: [Dialog, FormsModule],
@@ -60,7 +63,6 @@ export class NewActivity implements OnInit {
   protected note = '';
   protected scadenza = '';
   protected ore: number | null = null;
-  protected assegnato = '';
   protected priorita: TaskPriority = 'Media';
   protected stato: TaskStatus = 'Da fare';
   protected avanzamento = 0;
@@ -93,7 +95,6 @@ export class NewActivity implements OnInit {
         ...(this.session.isAdmin()
           ? {
               utente: this.utente,
-              assegnato_a: this.assegnato,
               priorita: this.priorita,
               stato: this.stato,
               avanzamento: this.avanzamento,

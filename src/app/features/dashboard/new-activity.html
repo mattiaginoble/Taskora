@@ -2,7 +2,7 @@
   <form class="form-grid" (ngSubmit)="save()">
     @if (session.isAdmin()) {
       <label class="field wide">
-        <span>Dipendente <small>(chi deve svolgere l'attività)</small></span>
+        <span>Owner del task <small>(chi deve svolgere l'attività)</small></span>
         <select name="utente" [(ngModel)]="utente" required>
           @for (person of people.list(); track person.username) {
             <option [value]="person.username">{{ person.name }}</option>
@@ -78,15 +78,6 @@
     </label>
 
     @if (session.isAdmin()) {
-      <label class="field">
-        <span>Responsabile</span>
-        <select name="assegnato" [(ngModel)]="assegnato">
-          <option value="">Nessuno</option>
-          @for (admin of work.administrators(); track admin.username) {
-            <option [value]="admin.username">{{ admin.display_name }}</option>
-          }
-        </select>
-      </label>
       <label class="field">
         <span>Priorità</span>
         <select name="priorita" [(ngModel)]="priorita">
