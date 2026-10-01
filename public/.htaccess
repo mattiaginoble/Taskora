@@ -1,6 +1,18 @@
 # Taskora su Apache/Aruba.
-# L'app usa indirizzi con # (es. index.html#/attivita), quindi non servono
-# regole di riscrittura e funziona anche dentro una sottocartella.
+# L'app usa indirizzi con # (es. index.html#/attivita), quindi funziona anche
+# dentro una sottocartella senza regole di riscrittura per le sue pagine.
+
+# Indirizzi della versione precedente (segnalibri, pagine rimaste nella cache
+# del browser): portano alla pagina corrispondente della nuova app.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_URI} ^(.*/)(dashboard-inprogress|home)\.html$
+  RewriteRule ^ %1#/dashboard [R=302,NE,L]
+  RewriteCond %{REQUEST_URI} ^(.*/)todolist\.html$
+  RewriteRule ^ %1#/attivita [R=302,NE,L]
+  RewriteCond %{REQUEST_URI} ^(.*/)(riepilogo|gestione)\.html$
+  RewriteRule ^ %1#/%2 [R=302,NE,L]
+</IfModule>
 
 # index.html sempre aggiornato; i file con l'hash nel nome possono restare in cache
 <IfModule mod_headers.c>
