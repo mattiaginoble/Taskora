@@ -19,6 +19,7 @@ import { Dialog } from '../../shared/dialog';
 import { ScheduleBar } from '../../shared/schedule-bar';
 
 const FIELD_LABELS: Record<string, string> = {
+  utente: 'dipendente',
   progetto: 'progetto',
   descrizione: 'descrizione',
   scadenza: 'scadenza',
@@ -185,7 +186,7 @@ export class ProjectDetail {
       if (raw === null || raw === '') return '—';
       if (field === 'scadenza') return formatDate(raw);
       if (field === 'avanzamento') return `${raw}%`;
-      if (field === 'assegnato_a') return this.people.name(raw);
+      if (field === 'assegnato_a' || field === 'utente') return this.people.name(raw);
       return raw;
     };
     switch (event.event_type) {

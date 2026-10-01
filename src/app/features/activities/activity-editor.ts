@@ -28,7 +28,7 @@ import { Dialog } from '../../shared/dialog';
 })
 export class ActivityEditor implements OnInit {
   protected readonly work = inject(WorkService);
-  private readonly people = inject(PeopleService);
+  protected readonly people = inject(PeopleService);
   private readonly toast = inject(ToastService);
 
   readonly task = input.required<Task>();
@@ -51,6 +51,7 @@ export class ActivityEditor implements OnInit {
       .reverse(),
   );
 
+  protected utente = '';
   protected progetto = '';
   protected settore = '';
   protected assegnato = '';
@@ -67,6 +68,7 @@ export class ActivityEditor implements OnInit {
 
   ngOnInit(): void {
     const task = this.task();
+    this.utente = task.utente;
     this.progetto = task.progetto;
     this.settore = task.settore ?? '';
     this.assegnato = task.assegnato_a ?? '';
@@ -81,6 +83,7 @@ export class ActivityEditor implements OnInit {
   private changes(): TaskUpdatePayload {
     const task = this.task();
     const payload: TaskUpdatePayload = { id: task.id };
+    if (this.utente && this.utente !== task.utente) payload.utente = this.utente;
     if (this.progetto.trim() !== task.progetto) payload.progetto = this.progetto.trim();
     if (this.settore !== (task.settore ?? '')) payload.settore = this.settore;
     if (this.assegnato !== (task.assegnato_a ?? '')) payload.assegnato_a = this.assegnato;
