@@ -26,24 +26,57 @@
   </div>
 
   <div class="panel">
-    <h2>Dipendenti</h2>
-    <div class="table-wrap">
+    <div>
+      <h2>Dipendenti</h2>
+      <p class="muted">
+        {{
+          users().length === totalUsers()
+            ? totalUsers() + ' dipendenti'
+            : users().length + ' di ' + totalUsers() + ' dipendenti'
+        }}
+      </p>
+    </div>
+    <div class="filters">
+      <label class="field grow">
+        <span>Cerca</span>
+        <input
+          type="search"
+          placeholder="Nome o nome utente"
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+        />
+      </label>
+      <button
+        type="button"
+        class="btn"
+        [attr.aria-pressed]="onlyAttention()"
+        (click)="onlyAttention.set(!onlyAttention())"
+      >
+        {{ onlyAttention() ? 'Mostra tutti' : 'Solo da verificare (' + attentionCount() + ')' }}
+      </button>
+    </div>
+    <div class="table-wrap users-table">
       <table class="data">
         <thead>
           <tr>
-            <th>Dipendente</th>
-            <th class="num" title="Task non completate">Aperte</th>
-            <th class="num">Scadute</th>
-            <th class="num">Bloccate</th>
-            <th class="num" title="Completate nel periodo">Completate</th>
-            <th class="num" title="Task create e note scritte nel periodo">Task e note</th>
-            <th class="num" title="Ore registrate nel periodo">Ore</th>
-            <th class="num" title="Giorni con almeno una task creata o una nota scritta">
-              Giorni attivi
-            </th>
-            <th>Ultimo aggiornamento</th>
-            <th class="num" title="Dalla creazione al completamento">Tempo medio</th>
-            <th class="num">Segnali</th>
+            @for (column of columns; track column.field) {
+              <th
+                [class.num]="column.num"
+                [attr.title]="column.title ?? null"
+                [attr.aria-sort]="
+                  sort().field === column.field ? (sort().asc ? 'ascending' : 'descending') : null
+                "
+              >
+                <button
+                  type="button"
+                  class="sort"
+                  [class.active]="sort().field === column.field"
+                  (click)="sortBy(column.field)"
+                >
+                  {{ column.label }} <span aria-hidden="true">{{ sortIcon(column.field) }}</span>
+                </button>
+              </th>
+            }
           </tr>
         </thead>
         <tbody>
@@ -53,7 +86,7 @@
               title="Mostra i segnali di questo dipendente"
               (click)="showSignals(user)"
             >
-              <td class="strong">{{ user.name }}</td>
+              <td class="strong nowrap">{{ user.name }}</td>
               <td class="num">{{ user.attivita_aperte }}</td>
               <td class="num" [class.bad]="user.scadute > 0">{{ user.scadute }}</td>
               <td class="num" [class.warn]="user.bloccate > 0">{{ user.bloccate }}</td>
@@ -68,7 +101,13 @@
           } @empty {
             <tr>
               <td colspan="11" class="empty">
-                {{ loading() ? 'Caricamento...' : 'Nessun dipendente' }}
+                {{
+                  loading()
+                    ? 'Caricamento...'
+                    : totalUsers()
+                      ? 'Nessun dipendente per i filtri scelti'
+                      : 'Nessun dipendente'
+                }}
               </td>
             </tr>
           }
@@ -80,13 +119,13 @@
   <div class="panel" #signalsPanel>
     <div class="page-head">
       <div>
-        <h2>Segnali da verificare</h2>
+        <h2>Segnali da verificare ({{ signals().length }})</h2>
         <p class="muted">Sono indizi da controllare con la persona, non prove.</p>
       </div>
       <div class="filters">
         <label class="field">
           <span>Dipendente</span>
-          <select [value]="signalUser()" (change)="signalUser.set($any($event.target).value)">
+          <select [value]="signalUser()" (change)="setSignalUser($any($event.target).value)">
             <option value="">Tutti</option>
             @for (item of signalUsers(); track item.username) {
               <option [value]="item.username" [selected]="item.username === signalUser()">
@@ -97,7 +136,7 @@
         </label>
         <label class="field">
           <span>Gravità</span>
-          <select [value]="severity()" (change)="severity.set($any($event.target).value)">
+          <select [value]="severity()" (change)="setSeverity($any($event.target).value)">
             <option value="">Tutte</option>
             <option value="alta">Alta</option>
             <option value="media">Media</option>
@@ -108,7 +147,7 @@
     </div>
 
     <ul class="entry-list">
-      @for (signal of signals(); track $index) {
+      @for (signal of visibleSignals(); track $index) {
         <li class="entry signal" [class]="'entry signal is-' + signal.severity">
           <p class="entry-meta">
             <span class="severity">{{ signal.severity }}</span>
@@ -129,6 +168,11 @@
         </li>
       }
     </ul>
+    @if (signals().length > visibleSignals().length) {
+      <button type="button" class="btn more" (click)="showMoreSignals()">
+        Mostra altri ({{ signals().length - visibleSignals().length }} rimanenti)
+      </button>
+    }
     <p class="muted small">{{ thresholds() }}</p>
   </div>
 </section>

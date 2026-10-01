@@ -81,17 +81,21 @@
   text-align: center;
 }
 .columns {
-  display: flex;
+  /* Una scheda per persona che va a capo: con tante persone si scorre in verticale
+     invece di stringere (o far scorrere di lato) le colonne */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  align-content: start;
+  align-items: start;
   gap: var(--space-4);
   min-height: 0;
   padding-bottom: var(--space-2);
-  overflow-x: auto;
+  overflow-y: auto;
 }
 .column {
   display: flex;
-  flex: 1 0 340px;
   flex-direction: column;
-  min-height: 0;
+  max-height: 30rem;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -155,11 +159,7 @@
     grid-template-rows: none;
   }
   .columns {
-    flex-direction: column;
     overflow: visible;
-  }
-  .column {
-    flex: none;
   }
   .actions {
     width: 100%;

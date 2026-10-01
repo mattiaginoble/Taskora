@@ -26,6 +26,53 @@ const PERIODS = [
   { days: 365, label: 'Ultimo anno' },
 ];
 
+/** Segnali mostrati per volta: con tanti dipendenti l'elenco diventa lunghissimo. */
+const SIGNALS_PAGE = 25;
+
+type SortField =
+  | 'name'
+  | 'attivita_aperte'
+  | 'scadute'
+  | 'bloccate'
+  | 'completate_periodo'
+  | 'task_inserite_periodo'
+  | 'ore_periodo'
+  | 'giorni_attivi'
+  | 'giorni_da_ultimo'
+  | 'tempo_medio_completamento'
+  | 'segnali';
+
+const COLUMNS: { field: SortField; label: string; title?: string; num?: boolean }[] = [
+  { field: 'name', label: 'Dipendente' },
+  { field: 'attivita_aperte', label: 'Aperte', title: 'Task non completate', num: true },
+  { field: 'scadute', label: 'Scadute', num: true },
+  { field: 'bloccate', label: 'Bloccate', num: true },
+  { field: 'completate_periodo', label: 'Completate', title: 'Completate nel periodo', num: true },
+  {
+    field: 'task_inserite_periodo',
+    label: 'Task e note',
+    title: 'Task create e note scritte nel periodo',
+    num: true,
+  },
+  { field: 'ore_periodo', label: 'Ore', title: 'Ore registrate nel periodo', num: true },
+  {
+    field: 'giorni_attivi',
+    label: 'Giorni attivi',
+    title: 'Giorni con almeno una task creata o una nota scritta',
+    num: true,
+  },
+  { field: 'giorni_da_ultimo', label: 'Ultimo aggiornamento' },
+  {
+    field: 'tempo_medio_completamento',
+    label: 'Tempo medio',
+    title: 'Dalla creazione al completamento',
+    num: true,
+  },
+  { field: 'segnali', label: 'Segnali', num: true },
+];
+
+type NamedUser = ReportUser & { name: string };
+
 /** Riepilogo per gli admin: andamento per dipendente e segnali da verificare. */
 @Component({
   selector: 'app-report',
@@ -38,6 +85,7 @@ export class ReportPage {
   private readonly toast = inject(ToastService);
 
   protected readonly periods = PERIODS;
+  protected readonly columns = COLUMNS;
   protected readonly formatDateTime = formatDateTime;
   private readonly signalsPanel = viewChild<ElementRef<HTMLElement>>('signalsPanel');
 
@@ -49,11 +97,50 @@ export class ReportPage {
   protected readonly sectors = signal<string[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  protected readonly query = signal('');
+  protected readonly onlyAttention = signal(false);
+  protected readonly sort = signal<{ field: SortField; asc: boolean }>({
+    field: 'name',
+    asc: true,
+  });
+  protected readonly signalsLimit = signal(SIGNALS_PAGE);
 
-  protected readonly users = computed(() =>
-    [...(this.report()?.users ?? [])]
-      .map((user) => ({ ...user, name: this.people.name(user.username) }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' })),
+  private readonly allUsers = computed<NamedUser[]>(() =>
+    (this.report()?.users ?? []).map((user) => ({
+      ...user,
+      name: this.people.name(user.username),
+    })),
+  );
+
+  protected readonly totalUsers = computed(() => this.allUsers().length);
+
+  /** Dipendenti filtrati (ricerca, solo da verificare) e ordinati. */
+  protected readonly users = computed(() => {
+    const query = this.query().trim().toLowerCase();
+    const { field, asc } = this.sort();
+    const byName = (a: NamedUser, b: NamedUser) =>
+      a.name.localeCompare(b.name, 'it', { sensitivity: 'base' });
+    return this.allUsers()
+      .filter(
+        (user) =>
+          (!query ||
+            user.name.toLowerCase().includes(query) ||
+            user.username.toLowerCase().includes(query)) &&
+          (!this.onlyAttention() || this.needsAttention(user)),
+      )
+      .sort((a, b) => {
+        if (field === 'name') return asc ? byName(a, b) : byName(b, a);
+        // "Mai aggiornato" conta come il più vecchio, il tempo medio mancante va in fondo
+        const missing = field === 'giorni_da_ultimo' ? Infinity : null;
+        const va = a[field] ?? missing;
+        const vb = b[field] ?? missing;
+        if (va === null || vb === null) return va === vb ? byName(a, b) : va === null ? 1 : -1;
+        return (asc ? va - vb : vb - va) || byName(a, b);
+      });
+  });
+
+  protected readonly attentionCount = computed(
+    () => this.allUsers().filter((user) => this.needsAttention(user)).length,
   );
 
   protected readonly signalUsers = computed(() => {
@@ -81,6 +168,8 @@ export class ReportPage {
         name: this.people.name(s.username),
       })),
   );
+
+  protected readonly visibleSignals = computed(() => this.signals().slice(0, this.signalsLimit()));
 
   protected readonly period = computed(() => {
     const report = this.report();
@@ -111,6 +200,7 @@ export class ReportPage {
       this.people.set(report.people);
       this.sectors.set(report.sectors);
       this.report.set(report);
+      this.signalsLimit.set(SIGNALS_PAGE);
       if (!this.signalUsers().some((u) => u.username === this.signalUser())) {
         this.signalUser.set('');
       }
@@ -120,6 +210,37 @@ export class ReportPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected sortBy(field: SortField): void {
+    // I numeri partono dal più alto: di solito si cerca chi ha più scadute o segnali
+    this.sort.update((current) =>
+      current.field === field ? { field, asc: !current.asc } : { field, asc: field === 'name' },
+    );
+  }
+
+  protected sortIcon(field: SortField): string {
+    const { field: active, asc } = this.sort();
+    return active === field ? (asc ? '▲' : '▼') : '↕';
+  }
+
+  protected setSignalUser(username: string): void {
+    this.signalUser.set(username);
+    this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  protected setSeverity(value: SignalSeverity | ''): void {
+    this.severity.set(value);
+    this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  protected showMoreSignals(): void {
+    this.signalsLimit.update((limit) => limit + SIGNALS_PAGE);
+  }
+
+  /** Da guardare: scadute, bloccate, segnali o nessun aggiornamento recente. */
+  protected needsAttention(user: ReportUser): boolean {
+    return user.scadute > 0 || user.bloccate > 0 || user.segnali > 0 || this.isIdle(user);
   }
 
   protected setDays(value: string): void {
@@ -133,7 +254,7 @@ export class ReportPage {
   }
 
   protected showSignals(user: ReportUser): void {
-    this.signalUser.set(user.username);
+    this.setSignalUser(user.username);
     this.signalsPanel()?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 

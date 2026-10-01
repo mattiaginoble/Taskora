@@ -35,19 +35,46 @@ export class AdminPage {
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
 
-  protected readonly users = computed(() =>
-    (this.data()?.users ?? []).map((user) => ({
-      ...user,
-      role: (ADMIN_ROLES.includes(String(user.role).toLowerCase())
-        ? 'administrator'
-        : 'user') as Role,
-      isSelf: user.username === this.session.user()?.username,
-      pending: Number(user.must_change_password) === 1,
-      created: this.date(user.created_at),
-    })),
+  protected readonly query = signal('');
+  protected readonly roleFilter = signal<Role | ''>('');
+  protected readonly passwordFilter = signal<'' | 'pending' | 'set'>('');
+
+  private readonly allUsers = computed(() =>
+    (this.data()?.users ?? [])
+      .map((user) => ({
+        ...user,
+        role: (ADMIN_ROLES.includes(String(user.role).toLowerCase())
+          ? 'administrator'
+          : 'user') as Role,
+        isSelf: user.username === this.session.user()?.username,
+        pending: Number(user.must_change_password) === 1,
+        created: this.date(user.created_at),
+      }))
+      .sort((a, b) =>
+        (a.display_name || a.username).localeCompare(b.display_name || b.username, 'it', {
+          sensitivity: 'base',
+        }),
+      ),
   );
 
+  protected readonly totalUsers = computed(() => this.allUsers().length);
+
+  /** Utenti filtrati da ricerca, ruolo e stato della password. */
+  protected readonly users = computed(() => {
+    const query = this.query().trim().toLowerCase();
+    const password = this.passwordFilter();
+    return this.allUsers().filter(
+      (user) =>
+        (!query ||
+          user.username.toLowerCase().includes(query) ||
+          (user.display_name ?? '').toLowerCase().includes(query)) &&
+        (!this.roleFilter() || user.role === this.roleFilter()) &&
+        (!password || user.pending === (password === 'pending')),
+    );
+  });
+
   // Nuovo utente
+  protected readonly creatingUser = signal(false);
   protected newName = '';
   protected newUsername = '';
   protected newRole: Role = 'user';
@@ -93,6 +120,11 @@ export class AdminPage {
     }
   }
 
+  protected openCreateUser(): void {
+    if (!this.newPassword) this.newPassword = generatePassword();
+    this.creatingUser.set(true);
+  }
+
   protected generate(): void {
     this.newPassword = generatePassword();
   }
@@ -114,6 +146,7 @@ export class AdminPage {
       this.newUsername = '';
       this.newRole = 'user';
       this.newPassword = '';
+      this.creatingUser.set(false);
     }
   }
 
