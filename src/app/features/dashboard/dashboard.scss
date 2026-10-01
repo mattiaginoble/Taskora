@@ -82,9 +82,13 @@
 }
 .columns {
   /* Una scheda per persona che va a capo: con tante persone si scorre in verticale
-     invece di stringere (o far scorrere di lato) le colonne */
+     invece di stringere (o far scorrere di lato) le colonne. auto-fit allarga le schede
+     presenti su tutta la riga invece di lasciare posto a colonne vuote. */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  /* Le schede scorrono al loro interno (altezza minima 0): senza max-content le righe
+     verrebbero schiacciate per stare nell'altezza della pagina e si sovrapporrebbero */
+  grid-auto-rows: max-content;
   align-content: start;
   align-items: start;
   gap: var(--space-4);
