@@ -81,31 +81,44 @@
   text-align: center;
 }
 .columns {
-  /* Una scheda per persona che va a capo: con tante persone si scorre in verticale
-     invece di stringere (o far scorrere di lato) le colonne */
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  align-content: start;
-  align-items: start;
+  /* Masonry: le schede sono divise in corsie (vedi lanes() nel componente) e si
+     incastrano una sotto l'altra senza lasciare spazi vuoti */
+  display: flex;
+  align-items: flex-start;
   gap: var(--space-4);
   min-height: 0;
   padding-bottom: var(--space-2);
   overflow-y: auto;
+
+  /* Una persona per corsia: le schede arrivano fino in fondo alla pagina e scorrono dentro */
+  &.single-row {
+    align-items: stretch;
+    .column {
+      max-height: none;
+    }
+  }
+}
+.lane {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 0;
 }
 .column {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
+  min-height: 0;
   max-height: 30rem;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
 
-  &.collapsed {
-    align-self: flex-start;
-    .chevron {
-      transform: rotate(180deg);
-    }
+  &.collapsed .chevron {
+    transform: rotate(180deg);
   }
 }
 .column-header {
@@ -160,6 +173,9 @@
   }
   .columns {
     overflow: visible;
+  }
+  .column {
+    max-height: none;
   }
   .actions {
     width: 100%;
