@@ -5,19 +5,30 @@
   (closed)="closed.emit()"
 >
   <div class="detail">
+    @if (options().length > 1) {
+      <label class="field picker">
+        <span>Attività</span>
+        <select name="record" [ngModel]="selectedId()" (ngModelChange)="selectRecord($event)">
+          @for (option of options(); track option.id) {
+            <option [value]="option.id">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+    }
+
     <section class="summary">
       <div class="badges">
-        <app-status-badge [status]="summary().stato" />
-        <app-priority-badge [priority]="summary().priorita" />
+        <app-status-badge [status]="current().stato" />
+        <app-priority-badge [priority]="current().priorita" />
       </div>
-      <app-schedule-bar class="bar" [task]="summary()" />
+      <app-schedule-bar class="bar" [task]="current()" />
       <p class="muted schedule">{{ schedule() }}</p>
     </section>
 
     <dl class="meta">
       <div>
         <dt>Owner del task</dt>
-        <dd>{{ employees() }}</dd>
+        <dd>{{ owner() }}</dd>
       </div>
       <div>
         <dt>Assegnato da</dt>
@@ -25,7 +36,7 @@
       </div>
       <div>
         <dt>Scadenza</dt>
-        <dd>{{ formatDate(summary().scadenza) }}</dd>
+        <dd>{{ formatDate(current().scadenza) }}</dd>
       </div>
       <div>
         <dt>Ore registrate</dt>
@@ -45,12 +56,26 @@
         } @else {
           <ul class="entry-list tasks">
             @for (entry of entries(); track $index) {
-              <li class="entry">
+              <li
+                class="entry"
+                [class.pickable]="entry.multiple"
+                [class.active]="entry.multiple && entry.record.id === selectedId()"
+                [attr.tabindex]="entry.multiple ? 0 : null"
+                [attr.title]="entry.multiple ? 'Mostra questa attività' : null"
+                (click)="entry.multiple && selectRecord(entry.record.id)"
+                (keydown.enter)="entry.multiple && selectRecord(entry.record.id)"
+              >
                 <p class="entry-meta">
-                  <span>{{ entry.author ? entry.author + ' - ' : '' }}{{ entry.date }}</span>
-                  @if (entry.record; as record) {
-                    <app-status-badge [status]="record.stato" />
-                    <span>Scadenza {{ formatDate(record.scadenza) }}</span>
+                  <span
+                    ><strong>{{ entry.owner }}</strong>
+                    @if (entry.writtenBy) {
+                      (scritta da {{ entry.writtenBy }})
+                    }
+                    - {{ entry.date }}</span
+                  >
+                  @if (entry.multiple) {
+                    <app-status-badge [status]="entry.record.stato" />
+                    <span>Scadenza {{ formatDate(entry.record.scadenza) }}</span>
                   }
                 </p>
                 <p class="entry-text">{{ entry.message || '-' }}</p>
@@ -63,12 +88,12 @@
       <section class="update">
         <h3>Aggiorna</h3>
         <form class="form-stack" (ngSubmit)="save()">
-          @if (options().length > 1) {
+          @if (session.isAdmin()) {
             <label class="field">
-              <span>Attività</span>
-              <select name="record" [ngModel]="selectedId()" (ngModelChange)="selectRecord($event)">
-                @for (option of options(); track option.id) {
-                  <option [value]="option.id">{{ option.label }}</option>
+              <span>Owner del task</span>
+              <select name="owner" [(ngModel)]="ownerInput">
+                @for (person of people.list(); track person.username) {
+                  <option [value]="person.username">{{ person.name }}</option>
                 }
               </select>
             </label>

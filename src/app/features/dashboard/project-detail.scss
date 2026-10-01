@@ -48,9 +48,23 @@
     font-size: var(--text-base);
   }
 }
+.picker {
+  max-width: 560px;
+}
 .tasks {
   max-height: 420px;
   overflow-y: auto;
+}
+.entry.pickable {
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+  &.active {
+    border-color: var(--color-primary);
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
 }
 .update {
   padding: var(--space-4);
