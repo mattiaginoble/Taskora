@@ -52,6 +52,7 @@ La cartella `storage/` viene creata da PHP alla prima richiesta: deve essere scr
 Il database è lo stesso: non serve nessuna migrazione. Dopo aver caricato `dist/`:
 
 - `index.html` viene sostituito dalla nuova app: l'indirizzo del sito resta lo stesso.
+- I vecchi indirizzi (`todolist.html`, `dashboard-inprogress.html`, `riepilogo.html`, `gestione.html`, `home.html`) portano da soli alla pagina corrispondente della nuova app, grazie a `.htaccess`.
 - Si possono cancellare dal server i file della versione precedente: `dashboard-inprogress.html`, `todolist.html`, `riepilogo.html`, `gestione.html`, le cartelle `assets/` e `app/`, `README.md`, `.gitignore`.
 - Da tenere: `config.local.php` e `storage/`.
 - Se nella cartella c'era già un `.htaccess` con regole tue (es. redirect a https), unisci quelle regole al nuovo file invece di sovrascriverlo.
