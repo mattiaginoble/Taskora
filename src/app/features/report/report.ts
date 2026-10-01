@@ -9,12 +9,13 @@ import { ToastService } from '../../core/toast';
 const SIGNAL_LABELS: Record<string, string> = {
   overdue: 'Scaduta',
   stale: 'Ferma',
+  // Segnale dei riepiloghi precedenti alle task singole
   completed_without_tasks: 'Completata senza task',
   progress_jump: 'Salto di avanzamento',
   due_date_postponed: 'Scadenza posticipata',
-  history_edited: 'Storico riscritto',
+  history_edited: 'Note riscritte',
   deleted: 'Eliminata',
-  burst: 'Task inserite in blocco',
+  burst: 'Note scritte in blocco',
   inactive_user: 'Nessun aggiornamento',
 };
 
@@ -90,7 +91,7 @@ export class ReportPage {
   protected readonly thresholds = computed(() => {
     const t = this.report()?.thresholds;
     if (!t) return '';
-    return `Soglie: attività ferma da ${t.stale_days} giorni, salto di avanzamento di ${t.progress_jump} punti, ${t.burst_count} task in ${t.burst_minutes} minuti. Il registro eventi parte dall'aggiornamento del sistema: salti, riscritture ed eliminazioni precedenti non sono rilevabili.`;
+    return `Soglie: task ferma da ${t.stale_days} giorni, salto di avanzamento di ${t.progress_jump} punti, ${t.burst_count} note in ${t.burst_minutes} minuti. Il registro eventi parte dall'aggiornamento del sistema: salti, riscritture ed eliminazioni precedenti non sono rilevabili.`;
   });
 
   constructor() {

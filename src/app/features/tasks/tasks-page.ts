@@ -1,13 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { TASK_STATUSES, Task, TaskStatus } from '../../core/models';
 import { PeopleService } from '../../core/people';
-import { formatDate, isOverdue, parseTaskEntries } from '../../core/task-utils';
+import { formatDate, isOverdue } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
 import { WorkService } from '../../core/work';
 import { PriorityBadge, StatusBadge } from '../../shared/badges';
 import { ScheduleBar } from '../../shared/schedule-bar';
-import { NewActivity } from '../dashboard/new-activity';
-import { ActivityEditor } from './activity-editor';
+import { NewTask } from './new-task';
+import { TaskDialog } from './task-dialog';
 
 type SortField =
   | 'utente'
@@ -25,7 +25,6 @@ interface Row {
   task: Task;
   employee: string;
   assignedBy: string;
-  lastTask: string;
   overdue: boolean;
 }
 
@@ -37,14 +36,14 @@ const STATUS_RANK: Record<TaskStatus, number> = {
   Completato: 3,
 };
 
-/** Attività (solo admin): tabella completa con filtri, modifica ed eliminazione. */
+/** Task (solo admin): tabella di tutte le task con filtri, modifica ed eliminazione. */
 @Component({
-  selector: 'app-activities',
-  imports: [StatusBadge, PriorityBadge, ScheduleBar, NewActivity, ActivityEditor],
-  templateUrl: './activities.html',
-  styleUrl: './activities.scss',
+  selector: 'app-tasks-page',
+  imports: [StatusBadge, PriorityBadge, ScheduleBar, NewTask, TaskDialog],
+  templateUrl: './tasks-page.html',
+  styleUrl: './tasks-page.scss',
 })
-export class ActivitiesPage {
+export class TasksPage {
   protected readonly work = inject(WorkService);
   private readonly people = inject(PeopleService);
   private readonly toast = inject(ToastService);
@@ -63,12 +62,8 @@ export class ActivitiesPage {
   });
   protected readonly selected = signal(new Set<string>());
   protected readonly creating = signal(false);
-  private readonly editingId = signal<string | null>(null);
+  protected readonly editingId = signal<string | null>(null);
   protected readonly completing = signal(false);
-
-  protected readonly editing = computed(
-    () => this.work.tasks().find((t) => t.id === this.editingId()) ?? null,
-  );
 
   protected readonly rows = computed<Row[]>(() => {
     const query = this.query().trim().toLowerCase();
@@ -89,6 +84,7 @@ export class ActivitiesPage {
           task.creato_da,
           this.people.name(task.creato_da),
           task.settore,
+          task.titolo,
           task.note,
         ].some((value) =>
           String(value ?? '')
@@ -100,7 +96,6 @@ export class ActivitiesPage {
         task,
         employee: this.people.name(task.utente) || '-',
         assignedBy: this.people.name(task.creato_da) || '-',
-        lastTask: parseTaskEntries(task.note).pop()?.message ?? '-',
         overdue: isOverdue(task.scadenza, task.stato),
       }));
 
@@ -113,7 +108,7 @@ export class ActivitiesPage {
         case 'creato_da':
           return row.assignedBy.toLowerCase();
         case 'task':
-          return row.lastTask.toLowerCase();
+          return t.titolo.toLowerCase();
         case 'priorita':
           return PRIORITY_RANK[t.priorita] ?? 2;
         case 'avanzamento':
@@ -142,9 +137,9 @@ export class ActivitiesPage {
     const rows = this.rows();
     const open = rows.filter((r) => r.task.stato !== 'Completato').length;
     const late = rows.filter((r) => r.overdue).length;
-    if (rows.length === 0) return 'Nessuna attività';
+    if (rows.length === 0) return 'Nessuna task';
     return [
-      `${rows.length} attività`,
+      `${rows.length} task`,
       open !== rows.length ? `${open} aperte` : '',
       late ? `${late} scadute` : '',
     ]
@@ -208,10 +203,6 @@ export class ActivitiesPage {
     this.editingId.set(task.id);
   }
 
-  protected closeEditor(): void {
-    this.editingId.set(null);
-  }
-
   protected async completeSelected(): Promise<void> {
     const tasks = this.selectable();
     if (tasks.length === 0) return;
@@ -220,9 +211,7 @@ export class ActivitiesPage {
       for (const task of tasks) {
         await this.work.update({ id: task.id, stato: 'Completato' });
       }
-      this.toast.show(
-        tasks.length === 1 ? '1 attività completata' : `${tasks.length} attività completate`,
-      );
+      this.toast.show(tasks.length === 1 ? '1 task completata' : `${tasks.length} task completate`);
       this.selected.set(new Set());
     } catch (error) {
       this.toast.error(error);

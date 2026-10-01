@@ -1,8 +1,19 @@
-<app-dialog title="Nuova attività" (closed)="closed.emit()">
+<app-dialog title="Nuova task" (closed)="closed.emit()">
   <form class="form-grid" (ngSubmit)="save()">
+    <label class="field wide">
+      <span>Task</span>
+      <textarea
+        name="titolo"
+        rows="3"
+        [(ngModel)]="titolo"
+        placeholder="Cosa c'è da fare?"
+        required
+        autofocus
+      ></textarea>
+    </label>
     @if (session.isAdmin()) {
       <label class="field wide">
-        <span>Owner del task <small>(chi deve svolgere l'attività)</small></span>
+        <span>Owner del task <small>(chi deve svolgerla)</small></span>
         <select name="utente" [(ngModel)]="utente" required>
           @for (person of people.list(); track person.username) {
             <option [value]="person.username">{{ person.name }}</option>
@@ -19,7 +30,6 @@
         placeholder="Scrivi o scegli un progetto"
         autocomplete="off"
         required
-        autofocus
       />
       <datalist id="project-list">
         @for (project of work.projects(); track project.id) {
@@ -35,17 +45,6 @@
           <option [value]="sector">{{ sector }}</option>
         }
       </select>
-    </label>
-
-    <label class="field wide">
-      <span>Task</span>
-      <textarea
-        name="note"
-        rows="3"
-        [(ngModel)]="note"
-        placeholder="Descrivi la prima task da svolgere"
-        required
-      ></textarea>
     </label>
 
     <div class="field">
@@ -111,7 +110,7 @@
 
     <div class="wide actions">
       <button type="submit" class="btn btn-primary" [disabled]="saving()">
-        {{ saving() ? 'Creazione...' : 'Crea attività' }}
+        {{ saving() ? 'Creazione...' : 'Crea task' }}
       </button>
     </div>
   </form>

@@ -1,6 +1,6 @@
 # Taskora
 
-Monitoraggio delle attività dei dipendenti, divise per settore e progetto, con riepilogo e segnali per gli amministratori.
+Monitoraggio del lavoro dei dipendenti: progetti divisi per settore, ognuno con le sue task, con riepilogo e segnali per gli amministratori.
 
 - **Interfaccia:** Angular 22 (componenti standalone, signals, nessuna libreria UI) in `src/`.
 - **Server:** API PHP 8 + MySQL/MariaDB in `api/`.
@@ -8,19 +8,26 @@ Monitoraggio delle attività dei dipendenti, divise per settore e progetto, con 
 
 ## Pagine
 
-L'app usa indirizzi con `#` (es. `index.html#/attivita`), così funziona in qualsiasi cartella del server senza regole di riscrittura.
+L'app usa indirizzi con `#` (es. `index.html#/task`), così funziona in qualsiasi cartella del server senza regole di riscrittura.
 
 | Indirizzo | Chi | Cosa |
 | --- | --- | --- |
 | `#/login` | tutti | Accesso |
-| `#/dashboard` | tutti | Schede per settore, una colonna per dipendente e una card per progetto; nel dettaglio si aggiungono task, stato, avanzamento e ore |
-| `#/attivita` | admin | Tabella di tutte le attività: filtri, ordinamento, modifica completa, completamento in blocco, eliminazione |
+| `#/dashboard` | tutti | Schede per settore, una colonna per persona e una card per progetto; nel dettaglio l'elenco delle task del progetto e la task scelta da aggiornare |
+| `#/task` | admin | Tabella di tutte le task: filtri, ordinamento, modifica completa, completamento in blocco, eliminazione |
 | `#/riepilogo` | admin | Andamento per dipendente e segnali da verificare, filtrabili per settore e periodo |
 | `#/gestione` | admin | Utenti (creazione, nome visualizzato, ruolo, reset password), settori e progetti |
 
 Dal menu utente ognuno può cambiare il proprio nome visualizzato e la password.
 
-Ogni attività ha un **Owner del task** (chi deve svolgerla: per i dipendenti sono loro stessi, gli admin la possono assegnare a chiunque e cambiarlo dopo) e un **Assegnato da** (chi l'ha creata, impostato in automatico e non modificabile).
+Ogni progetto ha le sue **task**. Ogni task ha:
+
+- testo, progetto, settore, scadenza, priorità, stato, avanzamento e ore lavorate;
+- un **Owner del task**: chi deve svolgerla. Per i dipendenti sono loro stessi; gli admin la possono assegnare a chiunque e cambiarlo dopo;
+- un **Assegnato da**: chi l'ha creata, impostato in automatico e non modificabile;
+- le **note** scritte durante il lavoro (chi, quando, cosa).
+
+L'owner aggiorna stato, avanzamento, ore e note; gli admin possono modificare tutto ed eliminare la task.
 
 ## Sviluppo
 
@@ -84,4 +91,4 @@ Le migrazioni partono da sole alla prima richiesta dopo un aggiornamento e vengo
 
 ## Registro eventi
 
-Ogni modifica a un'attività finisce nella tabella `task_events` (chi, cosa, quando, valore prima e dopo). L'applicazione non modifica né cancella mai queste righe e le attività eliminate restano nel database (`deleted_at`). Il registro è visibile agli admin nel dettaglio del progetto e alimenta i segnali del riepilogo.
+Ogni modifica a una task finisce nella tabella `task_events` (chi, cosa, quando, valore prima e dopo). L'applicazione non modifica né cancella mai queste righe e le task eliminate restano nel database (`deleted_at`). Il registro è visibile agli admin nel dettaglio di ogni task e alimenta i segnali del riepilogo.

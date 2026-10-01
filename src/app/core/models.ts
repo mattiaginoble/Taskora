@@ -11,12 +11,14 @@ export const TASK_STATUSES: readonly TaskStatus[] = [
 ];
 export const TASK_PRIORITIES: readonly TaskPriority[] = ['Bassa', 'Media', 'Alta'];
 
-/** Un'attività (riga della tabella `tasks`). Le task sono le righe del campo `note`. */
+/** Una task (riga della tabella `tasks`): appartiene a un progetto e ha le sue note. */
 export interface Task {
   id: string;
-  /** Owner del task: chi deve svolgere l'attività. */
+  /** Testo della task. */
+  titolo: string;
+  /** Owner del task: chi deve svolgerla. */
   utente: string;
-  /** "Assegnato da": chi ha creato l'attività, impostato dal server. */
+  /** "Assegnato da": chi ha creato la task, impostato dal server. */
   creato_da: string | null;
   progetto: string;
   descrizione: string;
@@ -25,6 +27,7 @@ export interface Task {
   assegnato_a: string | null;
   priorita: TaskPriority;
   settore: string | null;
+  /** Note scritte durante il lavoro: righe "[AAAA-MM-GG HH:MM] utente: testo". */
   note: string | null;
   stato: TaskStatus;
   avanzamento: number;
@@ -56,7 +59,14 @@ export interface InitData {
 }
 
 export type TaskEventType =
-  'created' | 'task_added' | 'field_changed' | 'history_edited' | 'deleted' | 'hours_logged';
+  | 'created'
+  | 'note_added'
+  /** Nome che avevano le note quando le task erano raggruppate in attività. */
+  | 'task_added'
+  | 'field_changed'
+  | 'history_edited'
+  | 'deleted'
+  | 'hours_logged';
 
 export interface TaskEvent {
   id: number;
@@ -69,13 +79,13 @@ export interface TaskEvent {
   created_at: string;
 }
 
-/** Dati per creare un'attività (POST api/task.php). */
+/** Dati per creare una task (POST api/task.php). */
 export interface NewTaskPayload {
+  titolo: string;
   /** Owner del task (solo admin; per i dipendenti è sempre chi la crea). */
   utente?: string;
   progetto: string;
   settore: string;
-  note: string;
   scadenza: string;
   ore?: string;
   priorita?: TaskPriority;
@@ -84,12 +94,13 @@ export interface NewTaskPayload {
 }
 
 /**
- * Aggiornamento di un'attività (PUT api/task.php). Il titolare può cambiare
- * stato, avanzamento, ore e aggiungere task; gli altri campi sono solo per gli admin.
+ * Aggiornamento di una task (PUT api/task.php). L'owner può cambiare stato,
+ * avanzamento, ore e aggiungere note; gli altri campi sono solo per gli admin.
  * I campi assenti restano invariati.
  */
 export interface TaskUpdatePayload {
   id: string;
+  titolo?: string;
   utente?: string;
   stato?: TaskStatus;
   avanzamento?: number;
@@ -99,7 +110,7 @@ export interface TaskUpdatePayload {
   settore?: string;
   scadenza?: string;
   priorita?: TaskPriority;
-  /** Riscrive lo storico delle task: finisce nel registro come modifica sospetta. */
+  /** Riscrive le note: finisce nel registro come modifica sospetta. */
   note?: string;
 }
 

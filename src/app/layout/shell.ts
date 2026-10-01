@@ -14,7 +14,7 @@ interface NavLink {
 
 const LINKS: NavLink[] = [
   { label: 'Dashboard', route: '/dashboard' },
-  { label: 'Attività', route: '/attivita', admin: true },
+  { label: 'Task', route: '/task', admin: true },
   { label: 'Riepilogo', route: '/riepilogo', admin: true },
   { label: 'Gestione', route: '/gestione', admin: true },
 ];

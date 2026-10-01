@@ -13,6 +13,7 @@ import {
 
 const task = (overrides: Partial<Task>): Task => ({
   id: 't',
+  titolo: 'Installare il server',
   utente: 'mario',
   progetto: 'HDM Scan',
   descrizione: '-',

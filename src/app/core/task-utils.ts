@@ -149,7 +149,7 @@ export const groupStatus = (tasks: Pick<Task, 'stato'>[]): TaskStatus => {
   return 'Da fare';
 };
 
-/** Riepilogo delle attività di un progetto per una persona. */
+/** Riepilogo delle task di un progetto per una persona. */
 export interface ProjectSummary {
   key: string;
   progetto: string;
@@ -173,7 +173,7 @@ export const summarizeProject = (records: Task[]): ProjectSummary => {
   const open = records.filter((r) => r.stato !== 'Completato');
   const relevant = open.length > 0 ? open : records;
 
-  // Scadenza più vicina tra le attività aperte (o l'ultima se tutte completate)
+  // Scadenza più vicina tra le task aperte (o l'ultima se tutte completate)
   const dueDates = relevant
     .map((r) => r.scadenza)
     .filter(Boolean)
@@ -232,7 +232,7 @@ export const groupByProject = (records: Task[]): ProjectSummary[] => {
   });
 };
 
-/** Ordine delle attività: prima quelle in corso, poi le più recenti. */
+/** Ordine delle task: prima quelle in corso, poi le più recenti. */
 export const sortTasks = (tasks: Task[]): Task[] =>
   [...tasks].sort((a, b) => {
     const inProgress = Number(b.stato === 'In corso') - Number(a.stato === 'In corso');

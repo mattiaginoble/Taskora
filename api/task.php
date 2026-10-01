@@ -13,8 +13,8 @@ $currentUser = $sessionUser['username'] ?? '';
 $isAdmin = isAdministrator($sessionUser);
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Campi confrontati per il registro eventi quando un'attività viene modificata.
-const TRACKED_FIELDS = ['utente', 'progetto', 'descrizione', 'scadenza', 'priorita', 'settore', 'stato', 'avanzamento'];
+// Campi confrontati per il registro eventi quando una task viene modificata.
+const TRACKED_FIELDS = ['titolo', 'utente', 'progetto', 'descrizione', 'scadenza', 'priorita', 'settore', 'stato', 'avanzamento'];
 
 function normalizeMilestoneText(string $value): string
 {
@@ -48,6 +48,19 @@ function appendMilestoneHistory(string $existingHistory, string $username, strin
     return $existing . "\n" . $newEntry;
 }
 
+function validateTitle($value): string
+{
+    $title = normalizeMilestoneText((string) $value);
+    if ($title === '') {
+        jsonResponse(['success' => false, 'error' => 'Scrivi il testo della task'], 422);
+    }
+    if (mb_strlen($title) > 2000) {
+        jsonResponse(['success' => false, 'error' => 'Il testo della task può avere al massimo 2000 caratteri'], 422);
+    }
+
+    return $title;
+}
+
 function isValidIsoDate(string $value): bool
 {
     $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
@@ -73,7 +86,7 @@ function resolveProjectName(PDO $pdo, string $name): string
     return (string) $project;
 }
 
-// Titolare dell'attività scelto da un admin: deve essere un utente esistente.
+// Owner della task scelto da un admin: deve essere un utente esistente.
 function validateTaskOwner(PDO $pdo, string $username): string
 {
     $stmt = $pdo->prepare('SELECT username FROM users WHERE LOWER(username) = LOWER(:username) LIMIT 1');
@@ -204,10 +217,7 @@ if ($method === 'POST') {
 
     $progetto = resolveProjectName($pdo, (string) ($input['progetto'] ?? ''));
 
-    $firstTask = normalizeMilestoneText((string) ($input['note'] ?? ''));
-    if ($firstTask === '') {
-        jsonResponse(['success' => false, 'error' => 'La task è obbligatoria'], 422);
-    }
+    $title = validateTitle($input['titolo'] ?? '');
 
     // Gli admin possono impostare qualsiasi scadenza, i dipendenti solo da oggi in poi.
     $scadenza = date('Y-m-d');
@@ -234,16 +244,18 @@ if ($method === 'POST') {
 
     $task = applyWorkTimestamps([
         'id' => uniqid('task_', true),
+        'titolo' => $title,
         'utente' => $taskUser,
         'progetto' => $progetto,
         'descrizione' => trim((string) ($input['descrizione'] ?? '-')) ?: '-',
         'scadenza' => $scadenza,
-        // "Assegnato da": sempre chi crea l'attività, non si sceglie
+        // "Assegnato da": sempre chi crea la task, non si sceglie
         'creato_da' => $currentUser,
         'assegnato_a' => null,
         'priorita' => $priorita,
         'settore' => $settore,
-        'note' => appendMilestoneHistory('', $currentUser, $firstTask),
+        // Le note arrivano dopo, man mano che si lavora sulla task
+        'note' => null,
         'stato' => $stato,
         'avanzamento' => $avanzamento,
         'ore_lavorate' => $hours,
@@ -255,13 +267,14 @@ if ($method === 'POST') {
 
     $pdo->beginTransaction();
     $pdo->prepare(
-        'INSERT INTO tasks (id, utente, creato_da, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at)
-         VALUES (:id, :utente, :creato_da, :progetto, :descrizione, :scadenza, :assegnato_a, :priorita, :settore, :note, :stato, :avanzamento, :ore_lavorate, :created_at, :started_at, :completed_at, :updated_at)'
+        'INSERT INTO tasks (id, titolo, utente, creato_da, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at)
+         VALUES (:id, :titolo, :utente, :creato_da, :progetto, :descrizione, :scadenza, :assegnato_a, :priorita, :settore, :note, :stato, :avanzamento, :ore_lavorate, :created_at, :started_at, :completed_at, :updated_at)'
     )->execute(array_combine(
         array_map(static fn ($key) => ':' . $key, array_keys($task)),
         array_values($task)
     ));
     logTaskEvent($pdo, $task['id'], $currentUser, 'created', null, null, json_encode([
+        'titolo' => $task['titolo'],
         'utente' => $task['utente'],
         'progetto' => $task['progetto'],
         'scadenza' => $task['scadenza'],
@@ -269,7 +282,6 @@ if ($method === 'POST') {
         'stato' => $task['stato'],
         'avanzamento' => $task['avanzamento'],
     ], JSON_UNESCAPED_UNICODE));
-    logTaskEvent($pdo, $task['id'], $currentUser, 'task_added', null, null, $firstTask);
     if ($hours > 0) {
         logTaskEvent($pdo, $task['id'], $currentUser, 'hours_logged', 'ore_lavorate', null, (string) $hours);
     }
@@ -283,26 +295,26 @@ if ($method === 'PUT') {
 
     $taskId = trim((string) ($input['id'] ?? ''));
     if ($taskId === '') {
-        jsonResponse(['success' => false, 'error' => 'ID attività obbligatorio'], 422);
+        jsonResponse(['success' => false, 'error' => 'ID della task obbligatorio'], 422);
     }
 
     $pdo->beginTransaction();
     $existing = fetchTaskById($pdo, $taskId, true);
     if (!$existing) {
         $pdo->rollBack();
-        jsonResponse(['success' => false, 'error' => 'Attività non trovata'], 404);
+        jsonResponse(['success' => false, 'error' => 'Task non trovata'], 404);
     }
 
-    // I dipendenti possono aggiornare solo le proprie attività.
+    // I dipendenti possono aggiornare solo le proprie task.
     $isOwner = strcasecmp((string) $existing['utente'], $currentUser) === 0;
     if (!$isAdmin && !$isOwner) {
         $pdo->rollBack();
-        jsonResponse(['success' => false, 'error' => 'Non puoi modificare questa attività'], 403);
+        jsonResponse(['success' => false, 'error' => 'Non puoi modificare questa task'], 403);
     }
 
     $updated = $existing;
 
-    // Campi modificabili da tutti: stato, avanzamento e nuove task in coda.
+    // Campi modificabili da tutti: stato, avanzamento, ore e nuove note.
     if (array_key_exists('stato', $input)) {
         $updated['stato'] = validateStatus($input['stato']);
     }
@@ -312,6 +324,9 @@ if ($method === 'PUT') {
 
     // Campi riservati agli admin; per i dipendenti vengono ignorati.
     if ($isAdmin) {
+        if (array_key_exists('titolo', $input)) {
+            $updated['titolo'] = validateTitle($input['titolo']);
+        }
         if (isset($input['utente']) && trim((string) $input['utente']) !== '') {
             $updated['utente'] = validateTaskOwner($pdo, (string) $input['utente']);
         }
@@ -335,12 +350,12 @@ if ($method === 'PUT') {
         }
     }
 
-    $appendedTask = normalizeMilestoneText((string) ($input['note_append'] ?? ''));
-    if ($appendedTask !== '') {
-        $updated['note'] = appendMilestoneHistory((string) $updated['note'], $currentUser, $appendedTask);
+    $appendedNote = normalizeMilestoneText((string) ($input['note_append'] ?? ''));
+    if ($appendedNote !== '') {
+        $updated['note'] = appendMilestoneHistory((string) $updated['note'], $currentUser, $appendedNote);
     }
 
-    // Ore lavorate: si sommano al totale dell'attività, non si sovrascrivono.
+    // Ore lavorate: si sommano al totale della task, non si sovrascrivono.
     $hours = validateHours($input['ore'] ?? '');
     $updated['ore_lavorate'] = round((float) $existing['ore_lavorate'] + $hours, 2);
 
@@ -351,7 +366,7 @@ if ($method === 'PUT') {
     $historyEdited = $isAdmin && array_key_exists('note', $input)
         && normalizeMilestoneText((string) $input['note']) !== normalizeMilestoneText((string) ($existing['note'] ?? ''));
 
-    if (!$changedFields && !$historyEdited && $appendedTask === '' && $hours <= 0) {
+    if (!$changedFields && !$historyEdited && $appendedNote === '' && $hours <= 0) {
         $pdo->commit();
         jsonResponse(['success' => true, 'task' => $existing]);
     }
@@ -361,12 +376,13 @@ if ($method === 'PUT') {
     $updated['updated_at'] = $now;
 
     $pdo->prepare(
-        'UPDATE tasks SET utente = :utente, progetto = :progetto, descrizione = :descrizione, scadenza = :scadenza,
+        'UPDATE tasks SET titolo = :titolo, utente = :utente, progetto = :progetto, descrizione = :descrizione, scadenza = :scadenza,
          priorita = :priorita, settore = :settore, note = :note, stato = :stato,
          avanzamento = :avanzamento, ore_lavorate = :ore_lavorate, started_at = :started_at, completed_at = :completed_at, updated_at = :updated_at
          WHERE id = :id'
     )->execute([
         ':id' => $taskId,
+        ':titolo' => $updated['titolo'],
         ':utente' => $updated['utente'],
         ':progetto' => $updated['progetto'],
         ':descrizione' => $updated['descrizione'],
@@ -396,8 +412,8 @@ if ($method === 'PUT') {
     if ($historyEdited) {
         logTaskEvent($pdo, $taskId, $currentUser, 'history_edited', 'note', (string) ($existing['note'] ?? ''), normalizeMilestoneText((string) $input['note']));
     }
-    if ($appendedTask !== '') {
-        logTaskEvent($pdo, $taskId, $currentUser, 'task_added', null, null, $appendedTask);
+    if ($appendedNote !== '') {
+        logTaskEvent($pdo, $taskId, $currentUser, 'note_added', null, null, $appendedNote);
     }
     if ($hours > 0) {
         logTaskEvent($pdo, $taskId, $currentUser, 'hours_logged', 'ore_lavorate', (string) $existing['ore_lavorate'], (string) $hours);
@@ -410,17 +426,17 @@ if ($method === 'PUT') {
 if ($method === 'DELETE') {
     $id = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
     if ($id === '') {
-        jsonResponse(['success' => false, 'error' => 'ID attività obbligatorio'], 422);
+        jsonResponse(['success' => false, 'error' => 'ID della task obbligatorio'], 422);
     }
 
     if (!$isAdmin) {
-        jsonResponse(['success' => false, 'error' => 'Solo l\'administrator può eliminare le attività'], 403);
+        jsonResponse(['success' => false, 'error' => 'Solo un amministratore può eliminare le task'], 403);
     }
 
     $pdo->beginTransaction();
     if (!fetchTaskById($pdo, $id, true)) {
         $pdo->rollBack();
-        jsonResponse(['success' => false, 'error' => 'Attività non trovata'], 404);
+        jsonResponse(['success' => false, 'error' => 'Task non trovata'], 404);
     }
 
     // Eliminazione logica: il record resta nel database e l'evento nel registro.

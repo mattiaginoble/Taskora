@@ -1,5 +1,5 @@
 # Taskora su Apache/Aruba.
-# L'app usa indirizzi con # (es. index.html#/attivita), quindi funziona anche
+# L'app usa indirizzi con # (es. index.html#/task), quindi funziona anche
 # dentro una sottocartella senza regole di riscrittura per le sue pagine.
 
 # Indirizzi della versione precedente (segnalibri, pagine rimaste nella cache
@@ -10,7 +10,7 @@
   RewriteCond %{REQUEST_URI} ^(.*/)(dashboard-inprogress|home)\.html$
   RewriteRule ^ %1#/dashboard [R=302,NE,L]
   RewriteCond %{REQUEST_URI} ^(.*/)todolist\.html$
-  RewriteRule ^ %1#/attivita [R=302,NE,L]
+  RewriteRule ^ %1#/task [R=302,NE,L]
   RewriteCond %{REQUEST_URI} ^(.*/)(riepilogo|gestione)\.html$
   RewriteRule ^ %1#/%2 [R=302,NE,L]
 </IfModule>
