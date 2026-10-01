@@ -23,7 +23,8 @@ import { ProjectDetail } from './project-detail';
 /** Scheda "Senza settore": task create prima che il settore fosse obbligatorio. */
 const NO_SECTOR = '__none__';
 
-/** Masonry: larghezza minima di una corsia e spazio tra le schede (--space-4). */
+/** Masonry: al massimo 3 corsie, larghezza minima di una corsia e spazio tra le schede (--space-4). */
+const MAX_LANES = 3;
 const LANE_MIN_WIDTH = 420;
 const LANE_GAP = 16;
 /** Altezze stimate per incastrare le schede: intestazione, card con spazio, margini, massimo (30rem). */
@@ -149,7 +150,7 @@ export class DashboardPage {
   protected readonly lanes = computed(() => {
     const columns = this.columns();
     const fit = Math.floor((this.boardWidth() + LANE_GAP) / (LANE_MIN_WIDTH + LANE_GAP));
-    const count = Math.max(1, Math.min(fit, columns.length));
+    const count = Math.max(1, Math.min(fit, MAX_LANES, columns.length));
     const lanes: EmployeeColumn[][] = Array.from({ length: count }, () => []);
     const heights = new Array<number>(count).fill(0);
     for (const column of columns) {
