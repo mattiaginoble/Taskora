@@ -11,6 +11,7 @@ import { ActivityEditor } from './activity-editor';
 
 type SortField =
   | 'utente'
+  | 'creato_da'
   | 'progetto'
   | 'settore'
   | 'task'
@@ -23,6 +24,7 @@ type SortField =
 interface Row {
   task: Task;
   employee: string;
+  assignedBy: string;
   lastTask: string;
   overdue: boolean;
 }
@@ -84,8 +86,8 @@ export class ActivitiesPage {
           task.utente,
           this.people.name(task.utente),
           task.progetto,
-          task.assegnato_a,
-          this.people.name(task.assegnato_a),
+          task.creato_da,
+          this.people.name(task.creato_da),
           task.settore,
           task.note,
         ].some((value) =>
@@ -97,6 +99,7 @@ export class ActivitiesPage {
       .map((task) => ({
         task,
         employee: this.people.name(task.utente) || '-',
+        assignedBy: this.people.name(task.creato_da) || '-',
         lastTask: parseTaskEntries(task.note).pop()?.message ?? '-',
         overdue: isOverdue(task.scadenza, task.stato),
       }));
@@ -107,6 +110,8 @@ export class ActivitiesPage {
       switch (field) {
         case 'utente':
           return row.employee.toLowerCase();
+        case 'creato_da':
+          return row.assignedBy.toLowerCase();
         case 'task':
           return row.lastTask.toLowerCase();
         case 'priorita':

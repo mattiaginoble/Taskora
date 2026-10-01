@@ -14,7 +14,7 @@ $isAdmin = isAdministrator($sessionUser);
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Campi confrontati per il registro eventi quando un'attività viene modificata.
-const TRACKED_FIELDS = ['utente', 'progetto', 'descrizione', 'scadenza', 'assegnato_a', 'priorita', 'settore', 'stato', 'avanzamento'];
+const TRACKED_FIELDS = ['utente', 'progetto', 'descrizione', 'scadenza', 'priorita', 'settore', 'stato', 'avanzamento'];
 
 function normalizeMilestoneText(string $value): string
 {
@@ -84,22 +84,6 @@ function validateTaskOwner(PDO $pdo, string $username): string
     }
 
     return (string) $owner;
-}
-
-function validateAssignee(PDO $pdo, string $assignee): string
-{
-    $assignee = trim($assignee);
-    if ($assignee === '') {
-        return '';
-    }
-
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = :username AND LOWER(role) IN ('administrator', 'admin') LIMIT 1");
-    $stmt->execute([':username' => $assignee]);
-    if (!$stmt->fetch()) {
-        jsonResponse(['success' => false, 'error' => 'L\'assegnatario selezionato deve essere un amministratore'], 422);
-    }
-
-    return $assignee;
 }
 
 function validateStatus($value): string
@@ -231,7 +215,6 @@ if ($method === 'POST') {
         $scadenza = validateDueDate($input['scadenza'], $isAdmin);
     }
 
-    $assegnatoA = $isAdmin ? validateAssignee($pdo, (string) ($input['assegnato_a'] ?? '')) : '';
 
     $stato = 'Da fare';
     if ($isAdmin && isset($input['stato']) && trim((string) $input['stato']) !== '') {
@@ -255,7 +238,9 @@ if ($method === 'POST') {
         'progetto' => $progetto,
         'descrizione' => trim((string) ($input['descrizione'] ?? '-')) ?: '-',
         'scadenza' => $scadenza,
-        'assegnato_a' => $assegnatoA,
+        // "Assegnato da": sempre chi crea l'attività, non si sceglie
+        'creato_da' => $currentUser,
+        'assegnato_a' => null,
         'priorita' => $priorita,
         'settore' => $settore,
         'note' => appendMilestoneHistory('', $currentUser, $firstTask),
@@ -270,8 +255,8 @@ if ($method === 'POST') {
 
     $pdo->beginTransaction();
     $pdo->prepare(
-        'INSERT INTO tasks (id, utente, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at)
-         VALUES (:id, :utente, :progetto, :descrizione, :scadenza, :assegnato_a, :priorita, :settore, :note, :stato, :avanzamento, :ore_lavorate, :created_at, :started_at, :completed_at, :updated_at)'
+        'INSERT INTO tasks (id, utente, creato_da, progetto, descrizione, scadenza, assegnato_a, priorita, settore, note, stato, avanzamento, ore_lavorate, created_at, started_at, completed_at, updated_at)
+         VALUES (:id, :utente, :creato_da, :progetto, :descrizione, :scadenza, :assegnato_a, :priorita, :settore, :note, :stato, :avanzamento, :ore_lavorate, :created_at, :started_at, :completed_at, :updated_at)'
     )->execute(array_combine(
         array_map(static fn ($key) => ':' . $key, array_keys($task)),
         array_values($task)
@@ -280,7 +265,6 @@ if ($method === 'POST') {
         'utente' => $task['utente'],
         'progetto' => $task['progetto'],
         'scadenza' => $task['scadenza'],
-        'assegnato_a' => $task['assegnato_a'],
         'priorita' => $task['priorita'],
         'stato' => $task['stato'],
         'avanzamento' => $task['avanzamento'],
@@ -337,9 +321,6 @@ if ($method === 'PUT') {
         if (array_key_exists('scadenza', $input)) {
             $updated['scadenza'] = validateDueDate($input['scadenza'], true);
         }
-        if (array_key_exists('assegnato_a', $input)) {
-            $updated['assegnato_a'] = validateAssignee($pdo, (string) $input['assegnato_a']);
-        }
         if (isset($input['priorita']) && trim((string) $input['priorita']) !== '') {
             $updated['priorita'] = validatePriority($input['priorita']);
         }
@@ -381,7 +362,7 @@ if ($method === 'PUT') {
 
     $pdo->prepare(
         'UPDATE tasks SET utente = :utente, progetto = :progetto, descrizione = :descrizione, scadenza = :scadenza,
-         assegnato_a = :assegnato_a, priorita = :priorita, settore = :settore, note = :note, stato = :stato,
+         priorita = :priorita, settore = :settore, note = :note, stato = :stato,
          avanzamento = :avanzamento, ore_lavorate = :ore_lavorate, started_at = :started_at, completed_at = :completed_at, updated_at = :updated_at
          WHERE id = :id'
     )->execute([
@@ -390,7 +371,6 @@ if ($method === 'PUT') {
         ':progetto' => $updated['progetto'],
         ':descrizione' => $updated['descrizione'],
         ':scadenza' => $updated['scadenza'],
-        ':assegnato_a' => $updated['assegnato_a'],
         ':priorita' => $updated['priorita'],
         ':settore' => $updated['settore'],
         ':note' => $updated['note'],

@@ -20,6 +20,8 @@ L'app usa indirizzi con `#` (es. `index.html#/attivita`), così funziona in qual
 
 Dal menu utente ognuno può cambiare il proprio nome visualizzato e la password.
 
+Ogni attività ha un **Owner del task** (chi deve svolgerla: per i dipendenti sono loro stessi, gli admin la possono assegnare a chiunque e cambiarlo dopo) e un **Assegnato da** (chi l'ha creata, impostato in automatico e non modificabile).
+
 ## Sviluppo
 
 Serve Node 22.22.3 o più recente (consigliato Node 24) e PHP 8 con MySQL/MariaDB.

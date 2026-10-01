@@ -62,8 +62,8 @@ export class DashboardPage {
         task.utente,
         this.people.name(task.utente),
         task.progetto,
-        task.assegnato_a,
-        this.people.name(task.assegnato_a),
+        task.creato_da,
+        this.people.name(task.creato_da),
         task.priorita,
       ].some((value) =>
         String(value ?? '')

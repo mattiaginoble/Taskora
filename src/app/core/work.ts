@@ -1,18 +1,10 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api';
-import {
-  AdminUser,
-  InitData,
-  NewTaskPayload,
-  Project,
-  Task,
-  TaskEvent,
-  TaskUpdatePayload,
-} from './models';
+import { InitData, NewTaskPayload, Project, Task, TaskEvent, TaskUpdatePayload } from './models';
 import { PeopleService } from './people';
 
-/** Attività, progetti, settori e responsabili, caricati da api/init.php. */
+/** Attività, progetti e settori, caricati da api/init.php. */
 @Injectable({ providedIn: 'root' })
 export class WorkService {
   private readonly api = inject(ApiService);
@@ -21,8 +13,6 @@ export class WorkService {
   readonly tasks = signal<Task[]>([]);
   readonly projects = signal<Project[]>([]);
   readonly sectors = signal<string[]>([]);
-  /** Solo amministratori: gli unici che possono essere responsabili. */
-  readonly administrators = signal<AdminUser[]>([]);
   readonly loaded = signal(false);
 
   async load(): Promise<void> {
@@ -31,7 +21,6 @@ export class WorkService {
     this.tasks.set(data.tasks);
     this.projects.set(data.projects);
     this.sectors.set(data.sectors);
-    this.administrators.set(data.users);
     this.loaded.set(true);
   }
 

@@ -17,6 +17,7 @@ const task = (overrides: Partial<Task>): Task => ({
   progetto: 'HDM Scan',
   descrizione: '-',
   scadenza: '2026-10-10',
+  creato_da: 'admin',
   assegnato_a: '',
   priorita: 'Media',
   settore: 'IT',

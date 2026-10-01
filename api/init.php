@@ -16,8 +16,6 @@ $pdo = getPdo();
 $currentUser = $sessionUser['username'] ?? '';
 $isAdmin = isAdministrator($sessionUser);
 
-// Solo gli amministratori possono essere responsabili di un'attività.
-$users = fetchAdministrators($pdo);
 $projects = $pdo->query('SELECT id, nome FROM projects ORDER BY nome ASC')->fetchAll();
 
 $settoreFilter = isset($_GET['settore']) ? trim((string) $_GET['settore']) : '';
@@ -30,7 +28,6 @@ jsonResponse([
         'username' => $sessionUser['username'],
         'role' => $sessionUser['role'] ?? 'user',
     ],
-    'users' => $users,
     'projects' => $projects,
     'sectors' => fetchSectors($pdo),
     'people' => fetchPeople($pdo),
