@@ -59,28 +59,46 @@ export class ProjectDetail {
       .filter(Boolean)
       .join(' · ');
   });
-  protected readonly schedule = computed(() => describeSchedule(this.summary()));
-  protected readonly employees = computed(
-    () => this.people.names(this.records().map((r) => r.utente)) || '-',
-  );
-  protected readonly assignedBy = computed(
-    () => this.people.names(this.records().map((r) => r.creato_da)) || '-',
-  );
-  protected readonly hours = computed(() => formatHours(this.summary().ore_lavorate));
-  protected readonly lastUpdate = computed(() => formatDateTime(this.summary().updated_at));
 
-  /** Task di tutte le attività, dalla più recente; con più attività riportano stato e scadenza. */
+  /** Attività scelta: stato, barra e dati in alto si riferiscono a lei, non a tutto il progetto. */
+  protected readonly selectedId = signal('');
+  protected readonly selected = computed(
+    () => this.records().find((r) => r.id === this.selectedId()) ?? null,
+  );
+  protected readonly current = computed(() => {
+    const selected = this.selected();
+    return summarizeProject(selected ? [selected] : this.records());
+  });
+  protected readonly schedule = computed(() => describeSchedule(this.current()));
+  protected readonly owner = computed(() => this.people.name(this.selected()?.utente) || '-');
+  protected readonly assignedBy = computed(
+    () => this.people.name(this.selected()?.creato_da) || '-',
+  );
+  protected readonly hours = computed(() => formatHours(this.current().ore_lavorate));
+  protected readonly lastUpdate = computed(() => formatDateTime(this.current().updated_at));
+
+  /**
+   * Task di tutte le attività, dalla più recente. Ognuna riporta l'owner della sua
+   * attività (e chi l'ha scritta, se è un'altra persona); con più attività anche
+   * stato e scadenza, e un clic sceglie l'attività.
+   */
   protected readonly entries = computed(() => {
-    const showRecord = this.records().length > 1;
+    const multiple = this.records().length > 1;
     return this.records()
       .flatMap((record, recordIndex) =>
-        parseTaskEntries(record.note).map((entry, entryIndex) => ({
-          ...entry,
-          author: this.people.name(entry.user),
-          record: showRecord ? record : null,
-          recordIndex,
-          entryIndex,
-        })),
+        parseTaskEntries(record.note).map((entry, entryIndex) => {
+          const owner = this.people.name(record.utente);
+          const author = this.people.name(entry.user);
+          return {
+            ...entry,
+            owner,
+            writtenBy: author && author !== owner ? author : '',
+            record,
+            multiple,
+            recordIndex,
+            entryIndex,
+          };
+        }),
       )
       .sort(
         (a, b) =>
@@ -108,7 +126,7 @@ export class ProjectDetail {
   );
 
   // Modulo di aggiornamento
-  protected readonly selectedId = signal('');
+  protected ownerInput = '';
   protected note = '';
   protected hoursInput: number | null = null;
   protected stato: TaskStatus = 'Da fare';
@@ -132,6 +150,7 @@ export class ProjectDetail {
     this.selectedId.set(id);
     const record = this.records().find((r) => r.id === id);
     if (record) {
+      this.ownerInput = record.utente;
       this.stato = record.stato;
       this.avanzamento = clampProgress(record.avanzamento);
     }
@@ -142,9 +161,15 @@ export class ProjectDetail {
     if (!record) return;
     const note = this.note.trim();
     const ore = this.hoursInput ? String(this.hoursInput) : '';
+    // Solo gli admin cambiano l'owner (il server lo ignora per gli altri)
+    const owner =
+      this.session.isAdmin() && this.ownerInput && this.ownerInput !== record.utente
+        ? this.ownerInput
+        : '';
     if (
       !note &&
       !ore &&
+      !owner &&
       this.stato === record.stato &&
       this.avanzamento === clampProgress(record.avanzamento)
     ) {
@@ -159,6 +184,7 @@ export class ProjectDetail {
         avanzamento: this.avanzamento,
         note_append: note,
         ore,
+        ...(owner ? { utente: owner } : {}),
       });
       this.note = '';
       this.hoursInput = null;
