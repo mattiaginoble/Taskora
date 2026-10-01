@@ -77,47 +77,51 @@
       </p>
     </div>
   } @else {
-    <div class="columns">
-      @for (column of columns(); track column.username) {
-        <section class="column" [class.collapsed]="collapsed().has(column.username)">
-          <button
-            type="button"
-            class="column-header"
-            [attr.aria-expanded]="!collapsed().has(column.username)"
-            (click)="toggleColumn(column.username)"
-          >
-            <span class="avatar">{{ avatar(column.name) }}</span>
-            <span class="name">{{ column.name }}</span>
-            <span class="muted count">
-              {{ column.projects.length }}
-              {{ column.projects.length === 1 ? 'progetto' : 'progetti'
-              }}{{ column.inProgress ? ' · ' + column.inProgress + ' in corso' : '' }}
-            </span>
-            <svg
-              class="chevron"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              aria-hidden="true"
-            >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-          @if (!collapsed().has(column.username)) {
-            <div class="cards">
-              @for (project of column.projects; track project.key) {
-                <app-project-card
-                  [project]="project"
-                  (open)="openProject(column.username, project)"
-                  (filterProject)="selectedProject.set($event)"
-                />
+    <div class="columns" #board [class.single-row]="singleRow()">
+      @for (lane of lanes(); track $index) {
+        <div class="lane">
+          @for (column of lane; track column.username) {
+            <section class="column" [class.collapsed]="collapsed().has(column.username)">
+              <button
+                type="button"
+                class="column-header"
+                [attr.aria-expanded]="!collapsed().has(column.username)"
+                (click)="toggleColumn(column.username)"
+              >
+                <span class="avatar">{{ avatar(column.name) }}</span>
+                <span class="name">{{ column.name }}</span>
+                <span class="muted count">
+                  {{ column.projects.length }}
+                  {{ column.projects.length === 1 ? 'progetto' : 'progetti'
+                  }}{{ column.inProgress ? ' · ' + column.inProgress + ' in corso' : '' }}
+                </span>
+                <svg
+                  class="chevron"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  aria-hidden="true"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              @if (!collapsed().has(column.username)) {
+                <div class="cards">
+                  @for (project of column.projects; track project.key) {
+                    <app-project-card
+                      [project]="project"
+                      (open)="openProject(column.username, project)"
+                      (filterProject)="selectedProject.set($event)"
+                    />
+                  }
+                </div>
               }
-            </div>
+            </section>
           }
-        </section>
+        </div>
       }
     </div>
   }

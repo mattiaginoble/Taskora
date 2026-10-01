@@ -1,4 +1,14 @@
-import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { Task } from '../../core/models';
 import { PeopleService } from '../../core/people';
@@ -12,6 +22,15 @@ import { ProjectDetail } from './project-detail';
 
 /** Scheda "Senza settore": task create prima che il settore fosse obbligatorio. */
 const NO_SECTOR = '__none__';
+
+/** Masonry: larghezza minima di una corsia e spazio tra le schede (--space-4). */
+const LANE_MIN_WIDTH = 420;
+const LANE_GAP = 16;
+/** Altezze stimate per incastrare le schede: intestazione, card con spazio, margini, massimo (30rem). */
+const HEADER_HEIGHT = 57;
+const CARD_HEIGHT = 53;
+const CARDS_PADDING = 12;
+const COLUMN_MAX_HEIGHT = 480;
 
 interface EmployeeColumn {
   username: string;
@@ -42,6 +61,9 @@ export class DashboardPage {
   protected readonly selectedProject = signal('');
   protected readonly collapsed = signal(new Set<string>());
   protected readonly creating = signal(false);
+  /** Larghezza dell'area delle schede, per sapere quante corsie ci stanno. */
+  private readonly boardWidth = signal(0);
+  private readonly board = viewChild<ElementRef<HTMLElement>>('board');
   /** Progetto aperto nel dettaglio: owner (colonna) e nome del progetto. */
   private readonly openProjectKey = signal<{ owner: string; project: string } | null>(null);
 
@@ -120,6 +142,27 @@ export class DashboardPage {
       .sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
   });
 
+  /**
+   * Schede distribuite in corsie (masonry): ognuna va nella corsia più bassa, così le
+   * schede corte non lasciano buchi e l'ordine alfabetico resta da sinistra a destra.
+   */
+  protected readonly lanes = computed(() => {
+    const columns = this.columns();
+    const fit = Math.floor((this.boardWidth() + LANE_GAP) / (LANE_MIN_WIDTH + LANE_GAP));
+    const count = Math.max(1, Math.min(fit, columns.length));
+    const lanes: EmployeeColumn[][] = Array.from({ length: count }, () => []);
+    const heights = new Array<number>(count).fill(0);
+    for (const column of columns) {
+      const lane = heights.indexOf(Math.min(...heights));
+      lanes[lane].push(column);
+      heights[lane] += this.estimateHeight(column) + LANE_GAP;
+    }
+    return lanes;
+  });
+
+  /** Una persona per corsia: le schede possono usare tutta l'altezza della pagina. */
+  protected readonly singleRow = computed(() => this.lanes().every((lane) => lane.length <= 1));
+
   protected readonly totals = computed(() => {
     const columns = this.columns();
     const projects = columns.reduce((sum, c) => sum + c.projects.length, 0);
@@ -142,6 +185,15 @@ export class DashboardPage {
   });
 
   constructor() {
+    effect((onCleanup) => {
+      const element = this.board()?.nativeElement;
+      if (!element) return;
+      const observer = new ResizeObserver(([entry]) =>
+        this.boardWidth.set(entry.contentRect.width),
+      );
+      observer.observe(element);
+      onCleanup(() => observer.disconnect());
+    });
     this.work
       .load()
       .catch((error) => this.toast.error(error))
@@ -182,6 +234,14 @@ export class DashboardPage {
 
   protected closeProject(): void {
     this.openProjectKey.set(null);
+  }
+
+  private estimateHeight(column: EmployeeColumn): number {
+    if (this.collapsed().has(column.username)) return HEADER_HEIGHT;
+    return Math.min(
+      HEADER_HEIGHT + CARDS_PADDING + column.projects.length * CARD_HEIGHT,
+      COLUMN_MAX_HEIGHT,
+    );
   }
 
   protected avatar(name: string): string {
