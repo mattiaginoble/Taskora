@@ -164,6 +164,8 @@ export interface Report {
   signals: ReportSignal[];
   /** Segnali segnati come falsi positivi: esclusi da signals e dal conteggio per dipendente. */
   dismissed_signals: ReportSignal[];
+  /** Attività nel periodo: username → giorno (AAAA-MM-GG) → numero di azioni. */
+  activity: Record<string, Record<string, number>>;
 }
 
 /** Gestione (GET api/admin.php). */

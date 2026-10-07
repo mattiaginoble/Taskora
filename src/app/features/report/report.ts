@@ -15,6 +15,8 @@ import { PeopleService } from '../../core/people';
 import { SessionService } from '../../core/session';
 import { formatDate, formatDateTime, todayIso } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
+import { BarRow, BarSelection, BarSeries, StackedBars } from '../../shared/stacked-bars';
+import { ActivityMap, ActivityRow } from './activity-map';
 
 const SIGNAL_LABELS: Record<string, string> = {
   overdue: 'Scaduta',
@@ -27,6 +29,32 @@ const SIGNAL_LABELS: Record<string, string> = {
   deleted: 'Eliminata',
   burst: 'Note scritte in blocco',
   inactive_user: 'Nessun aggiornamento',
+};
+
+const SEVERITIES: { key: SignalSeverity; label: string }[] = [
+  { key: 'alta', label: 'Alta' },
+  { key: 'media', label: 'Media' },
+  { key: 'info', label: 'Info' },
+];
+
+/** Colori della gravità nei grafici (vedi --chart-sev-* in styles.scss). */
+const SEVERITY_SERIES: BarSeries[] = [
+  { key: 'alta', label: 'Alta', color: 'var(--chart-sev-high)' },
+  { key: 'media', label: 'Media', color: 'var(--chart-sev-medium)' },
+  { key: 'info', label: 'Info', color: 'var(--chart-sev-info)' },
+];
+
+/** Segnali legati a un giorno preciso: segnati sulla mappa dell'attività. */
+const DAY_SIGNALS = ['burst', 'progress_jump', 'history_edited', 'deleted', 'due_date_postponed'];
+
+const TYPE_SERIES: BarSeries[] = [
+  { key: 'count', label: 'Segnali', color: 'var(--color-primary)' },
+];
+
+/** Righe ordinate dalla più lunga, a pari merito per nome. */
+const byTotal = (a: BarRow, b: BarRow): number => {
+  const total = (row: BarRow) => Object.values(row.values).reduce((sum, v) => sum + v, 0);
+  return total(b) - total(a) || a.label.localeCompare(b.label, 'it', { sensitivity: 'base' });
 };
 
 const PERIODS = [
@@ -96,6 +124,7 @@ const bySeverity = (a: ReportSignal, b: ReportSignal): number =>
 /** Riepilogo per gli admin: andamento per dipendente e segnali da verificare. */
 @Component({
   selector: 'app-report',
+  imports: [StackedBars, ActivityMap],
   templateUrl: './report.html',
   styleUrl: './report.scss',
 })
@@ -115,6 +144,10 @@ export class ReportPage {
   protected readonly sector = signal('');
   protected readonly signalUser = signal('');
   protected readonly severity = signal<SignalSeverity | ''>('');
+  protected readonly signalType = signal('');
+  protected readonly severities = SEVERITIES;
+  protected readonly severitySeries = SEVERITY_SERIES;
+  protected readonly typeSeries = TYPE_SERIES;
   protected readonly report = signal<Report | null>(null);
   protected readonly sectors = signal<string[]>([]);
   protected readonly loading = signal(true);
@@ -194,7 +227,8 @@ export class ReportPage {
       .filter(
         (s) =>
           (!this.signalUser() || s.username === this.signalUser()) &&
-          (!this.severity() || s.severity === this.severity()),
+          (!this.severity() || s.severity === this.severity()) &&
+          (!this.signalType() || s.type === this.signalType()),
       )
       .map((s) => ({
         ...s,
@@ -204,6 +238,82 @@ export class ReportPage {
         source: s,
       })),
   );
+
+  /** Tipi di segnale presenti, per il filtro. */
+  protected readonly signalTypes = computed(() => {
+    const report = this.report();
+    const types = new Set([
+      ...(report?.signals ?? []).map((s) => s.type),
+      ...(report?.dismissed_signals ?? []).map((s) => s.type),
+    ]);
+    return [...types]
+      .map((type) => ({ type, label: SIGNAL_LABELS[type] ?? type }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'it'));
+  });
+
+  /** Segnali da verificare per gravità (riquadri sopra i grafici). */
+  protected readonly severityCounts = computed(() => {
+    const signals = this.report()?.signals ?? [];
+    return SEVERITIES.map((s) => ({
+      ...s,
+      count: signals.filter((signal) => signal.severity === s.key).length,
+    }));
+  });
+
+  /** Grafico: segnali da verificare per dipendente, divisi per gravità. */
+  protected readonly signalsByPerson = computed<BarRow[]>(() => {
+    const rows = new Map<string, BarRow>();
+    for (const s of this.report()?.signals ?? []) {
+      const row = rows.get(s.username) ?? {
+        id: s.username,
+        label: this.people.name(s.username),
+        values: {},
+      };
+      row.values[s.severity] = (row.values[s.severity] ?? 0) + 1;
+      rows.set(s.username, row);
+    }
+    return [...rows.values()].sort(byTotal);
+  });
+
+  /** Grafico: segnali da verificare per tipo. */
+  protected readonly signalsByType = computed<BarRow[]>(() => {
+    const rows = new Map<string, BarRow>();
+    for (const s of this.report()?.signals ?? []) {
+      const row = rows.get(s.type) ?? {
+        id: s.type,
+        label: SIGNAL_LABELS[s.type] ?? s.type,
+        values: { count: 0 },
+      };
+      row.values['count']++;
+      rows.set(s.type, row);
+    }
+    return [...rows.values()].sort(byTotal);
+  });
+
+  /** Mappa dell'attività: tutti i dipendenti del riepilogo, in ordine di nome. */
+  protected readonly activityRows = computed<ActivityRow[]>(() => {
+    const report = this.report();
+    if (!report) return [];
+    const marks = new Map<string, Record<string, string[]>>();
+    for (const s of report.signals) {
+      if (!s.at || !DAY_SIGNALS.includes(s.type)) continue;
+      const byDay = marks.get(s.username) ?? {};
+      const day = s.at.slice(0, 10);
+      byDay[day] = [...(byDay[day] ?? []), SIGNAL_LABELS[s.type] ?? s.type];
+      marks.set(s.username, byDay);
+    }
+    return this.allUsers()
+      .map((user) => ({
+        id: user.username,
+        label: user.name,
+        counts: report.activity?.[user.username] ?? {},
+        marks: marks.get(user.username) ?? {},
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'it', { sensitivity: 'base' }));
+  });
+
+  protected readonly activityFrom = computed(() => this.report()?.period.from.slice(0, 10) ?? '');
+  protected readonly activityTo = computed(() => this.report()?.period.to.slice(0, 10) ?? '');
 
   protected readonly visibleSignals = computed(() => this.signals().slice(0, this.signalsLimit()));
 
@@ -240,6 +350,9 @@ export class ReportPage {
       if (!this.signalUsers().some((u) => u.username === this.signalUser())) {
         this.signalUser.set('');
       }
+      if (!this.signalTypes().some((t) => t.type === this.signalType())) {
+        this.signalType.set('');
+      }
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : String(error));
       this.toast.error(error);
@@ -267,6 +380,33 @@ export class ReportPage {
 
   protected setSeverity(value: SignalSeverity | ''): void {
     this.severity.set(value);
+    this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  protected setSignalType(value: string): void {
+    this.signalType.set(value);
+    this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  /** Clic su un dipendente nel grafico: filtra per lui (e per la gravità del segmento). */
+  protected selectPersonBar({ row, series }: BarSelection): void {
+    this.signalUser.set(row);
+    this.severity.set(series as SignalSeverity | '');
+    this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  protected selectTypeBar({ row }: BarSelection): void {
+    this.setSignalType(row);
+  }
+
+  protected toggleSeverity(value: SignalSeverity): void {
+    this.setSeverity(this.severity() === value ? '' : value);
+  }
+
+  protected clearSignalFilters(): void {
+    this.signalUser.set('');
+    this.severity.set('');
+    this.signalType.set('');
     this.signalsLimit.set(SIGNALS_PAGE);
   }
 
@@ -388,6 +528,14 @@ export class ReportPage {
   protected setSector(value: string): void {
     this.sector.set(value);
     this.load();
+  }
+
+  /** Clic su un nome della mappa: mostra i suoi segnali (o li toglie). */
+  protected selectActivityRow(username: string): void {
+    this.setSignalUser(username);
+    if (username) {
+      this.signalsPanel()?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   protected showSignals(user: ReportUser): void {

@@ -85,3 +85,34 @@
   color: var(--color-overdue);
   font-weight: 700;
 }
+
+.trend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: var(--space-5) var(--space-6);
+
+  h3 {
+    font-size: var(--text-sm);
+  }
+  p {
+    margin-bottom: var(--space-3);
+    white-space: normal;
+  }
+}
+
+.deadlines {
+  display: grid;
+  gap: var(--space-5);
+
+  h3 {
+    font-size: var(--text-sm);
+  }
+  .note {
+    margin-bottom: var(--space-3);
+    font-size: var(--text-xs);
+  }
+  section > h3 + app-stacked-bars,
+  section > h3 + app-deadline-timeline {
+    margin-top: var(--space-3);
+  }
+}

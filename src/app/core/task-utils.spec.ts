@@ -2,6 +2,7 @@ import { Task } from './models';
 import {
   countByStatus,
   describeSchedule,
+  dueBucket,
   formatDateTime,
   groupByProject,
   groupStatus,
@@ -158,5 +159,16 @@ describe('countByStatus', () => {
         task({ stato: 'Completato' }),
       ]),
     ).toEqual({ 'Da fare': 0, 'In corso': 2, Completato: 1, Bloccato: 0 });
+  });
+});
+
+describe('dueBucket', () => {
+  const now = new Date(2026, 9, 7);
+  it('divide le task aperte per urgenza', () => {
+    expect(dueBucket({ scadenza: '2026-10-06', stato: 'In corso' }, now)).toBe('overdue');
+    expect(dueBucket({ scadenza: '2026-10-07', stato: 'In corso' }, now)).toBe('soon');
+    expect(dueBucket({ scadenza: '2026-10-14', stato: 'Da fare' }, now)).toBe('soon');
+    expect(dueBucket({ scadenza: '2026-10-15', stato: 'Da fare' }, now)).toBe('later');
+    expect(dueBucket({ scadenza: '', stato: 'Da fare' }, now)).toBe('none');
   });
 });

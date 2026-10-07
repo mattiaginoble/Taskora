@@ -128,6 +128,17 @@ foreach ($pdo->query('SELECT signal_key, reason, dismissed_by, dismissed_at FROM
     $dismissals[$row['signal_key']] = $row;
 }
 
+// Attività per dipendente e giorno del periodo (mappa dell'attività): task create,
+// note scritte e modifiche (stato, avanzamento, ore, scadenze...).
+$activity = [];
+$countActivity = static function (string $username, string $at) use (&$activity, &$stats, $since): void {
+    if (!isset($stats[$username]) || $at < $since) {
+        return;
+    }
+    $day = substr($at, 0, 10);
+    $activity[$username][$day] = ($activity[$username][$day] ?? 0) + 1;
+};
+
 $signals = [];
 $dismissedSignals = [];
 $addSignal = static function (string $type, string $severity, string $username, ?array $task, string $detail, ?string $at) use (&$signals, &$dismissedSignals, &$stats, $dismissals): void {
@@ -190,6 +201,7 @@ foreach ($tasks as $task) {
         if ($entry['at'] >= $since) {
             $stats[$entry['user']]['task_inserite_periodo']++;
             $stats[$entry['user']]['giorni_attivi'][substr($entry['at'], 0, 10)] = true;
+            $countActivity($entry['user'], $entry['at']);
         }
     }
 
@@ -233,6 +245,10 @@ foreach ($events as $event) {
     }
     // Qualsiasi modifica conta come attività del suo autore
     $touch((string) $event['username'], $event['created_at']);
+    // Creazione e note sono già contate dalle voci delle task: qui le altre modifiche
+    if (!in_array($event['event_type'], ['created', 'note_added', 'task_added'], true)) {
+        $countActivity((string) $event['username'], $event['created_at']);
+    }
     if (in_array($event['event_type'], ['note_added', 'task_added'], true)) {
         $taskAddedAt[$event['task_id'] . '|' . $event['username'] . '|' . $event['created_at']] = true;
         $addedByUser[$event['username']][] = $event;
@@ -334,5 +350,7 @@ jsonResponse([
     ],
     'users' => $users,
     'signals' => $signals,
+    // Oggetto anche se vuoto: username → { "AAAA-MM-GG": numero }
+    'activity' => (object) array_map(static fn (array $days): object => (object) $days, $activity),
     'dismissed_signals' => $dismissedSignals,
 ]);

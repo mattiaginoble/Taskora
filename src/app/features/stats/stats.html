@@ -57,6 +57,113 @@
       }
     </div>
 
+    <div class="panel">
+      <div class="page-head">
+        <div>
+          <h2>Andamento nel tempo</h2>
+          <p class="muted">{{ trendSummary() }}</p>
+        </div>
+        <div class="filters">
+          @if (persons().length > 1) {
+            <label class="field">
+              <span>Persona</span>
+              <select [value]="trendPerson()" (change)="trendPerson.set($any($event.target).value)">
+                <option value="">Tutti</option>
+                @for (person of persons(); track person.username) {
+                  <option [value]="person.username" [selected]="person.username === trendPerson()">
+                    {{ person.name }}
+                  </option>
+                }
+              </select>
+            </label>
+          }
+          <label class="field">
+            <span>Periodo</span>
+            <select [value]="weeksCount()" (change)="weeksCount.set(+$any($event.target).value)">
+              @for (item of periods; track item.weeks) {
+                <option [value]="item.weeks" [selected]="item.weeks === weeksCount()">
+                  {{ item.label }}
+                </option>
+              }
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="trend">
+        <section>
+          <h3>Create e completate</h3>
+          <p class="muted small">
+            Se le completate restano sotto le create, il lavoro si accumula.
+          </p>
+          <app-time-chart
+            label="Task create e completate per settimana"
+            [labels]="weekLabels()"
+            [titles]="weekTitles()"
+            [series]="flowSeries()"
+          />
+        </section>
+        <section>
+          <h3>Task aperte</h3>
+          <p class="muted small">Non completate alla fine di ogni settimana.</p>
+          <app-time-chart
+            label="Task aperte alla fine di ogni settimana"
+            kind="line"
+            [labels]="weekLabels()"
+            [titles]="weekTitles()"
+            [series]="openSeries()"
+          />
+        </section>
+        <section>
+          <h3>Ore registrate</h3>
+          <p class="muted small">Ore segnate sulle task, per settimana.</p>
+          @if (hoursAvailable()) {
+            <app-time-chart
+              label="Ore registrate per settimana"
+              unit=" h"
+              [labels]="weekLabels()"
+              [titles]="weekTitles()"
+              [series]="hoursSeries()"
+            />
+          } @else {
+            <p class="muted">Non è stato possibile caricare le ore.</p>
+          }
+        </section>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div>
+        <h2>Scadenze e carico</h2>
+        <p class="muted">Solo le task aperte. Rosso: scadute; ambra: in scadenza entro 7 giorni.</p>
+      </div>
+      @if (loadRows().length === 0) {
+        <p class="muted">Nessuna task aperta.</p>
+      } @else {
+        <div class="deadlines">
+          <section>
+            <h3>Task aperte per persona</h3>
+            @if (loadRows().length > 1) {
+              <p class="muted note">Clic su una persona per vedere solo le sue scadenze.</p>
+            }
+            <app-stacked-bars
+              label="Task aperte per persona e urgenza"
+              [rows]="loadRows()"
+              [series]="dueSeries"
+              [selectedRow]="loadPerson()"
+              (selected)="selectLoad($event)"
+            />
+          </section>
+          <section>
+            <h3>Linea del tempo delle scadenze</h3>
+            <p class="muted note">
+              Quattro settimane indietro e sei avanti; passa sopra un pallino per vedere le task.
+            </p>
+            <app-deadline-timeline [rows]="timelineRows()" />
+          </section>
+        </div>
+      }
+    </div>
+
     @if (persons().length > 1) {
       <div class="panel">
         <div>
