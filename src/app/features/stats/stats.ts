@@ -1,4 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { ApiService } from '../../core/api';
 import { Task, TaskStatus } from '../../core/models';
 import { PeopleService } from '../../core/people';
 import { SessionService } from '../../core/session';
@@ -6,9 +8,17 @@ import { countByStatus, isOverdue } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
 import { WorkService } from '../../core/work';
 import { StatusDonut } from '../../shared/status-donut';
+import { TimeChart, TimeSeries } from '../../shared/time-chart';
+import { HoursRow, lastWeeks, weeklyHours, weeklyTrend } from './trend';
 
 /** Filtro "Senza settore": task create prima che il settore fosse obbligatorio. */
 const NO_SECTOR = '__none__';
+
+const PERIODS = [
+  { weeks: 12, label: 'Ultime 12 settimane' },
+  { weeks: 26, label: 'Ultimi 6 mesi' },
+  { weeks: 52, label: 'Ultimo anno' },
+];
 
 interface Totals {
   total: number;
@@ -38,7 +48,7 @@ const totalsOf = (tasks: Task[], counts: Record<TaskStatus, number>): Totals => 
 /** Grafici sugli stati delle task: in generale e per persona. */
 @Component({
   selector: 'app-stats',
-  imports: [StatusDonut],
+  imports: [StatusDonut, TimeChart],
   templateUrl: './stats.html',
   styleUrl: './stats.scss',
 })
@@ -47,10 +57,17 @@ export class StatsPage {
   protected readonly session = inject(SessionService);
   private readonly people = inject(PeopleService);
   private readonly toast = inject(ToastService);
+  private readonly api = inject(ApiService);
 
   protected readonly loading = signal(true);
   protected readonly sector = signal('');
   protected readonly noSector = NO_SECTOR;
+  protected readonly periods = PERIODS;
+  /** Andamento nel tempo: settimane mostrate e persona scelta (vuoto = tutti). */
+  protected readonly weeksCount = signal(12);
+  protected readonly trendPerson = signal('');
+  /** Ore registrate per giorno; null se non è stato possibile caricarle. */
+  private readonly hours = signal<HoursRow[] | null>([]);
 
   protected readonly hasNoSector = computed(() => this.work.tasks().some((t) => !t.settore));
 
@@ -59,6 +76,78 @@ export class StatsPage {
     const tasks = this.work.tasks();
     if (!sector) return tasks;
     return tasks.filter((t) => (sector === NO_SECTOR ? !t.settore : t.settore === sector));
+  });
+
+  protected readonly weeks = computed(() => lastWeeks(this.weeksCount()));
+  protected readonly weekLabels = computed(() => this.weeks().map((w) => w.label));
+  protected readonly weekTitles = computed(() =>
+    this.weeks().map((w, i, all) =>
+      i === all.length - 1 ? `Settimana in corso (dal ${w.label})` : `Settimana dal ${w.label}`,
+    ),
+  );
+
+  private readonly trendTasks = computed(() => {
+    const person = this.trendPerson();
+    return person
+      ? this.tasks().filter((t) => (t.utente || 'Sconosciuto') === person)
+      : this.tasks();
+  });
+
+  private readonly trend = computed(() => weeklyTrend(this.trendTasks(), this.weeks()));
+
+  protected readonly flowSeries = computed<TimeSeries[]>(() => [
+    {
+      key: 'created',
+      label: 'Create',
+      color: 'var(--chart-progress)',
+      values: this.trend().created,
+    },
+    {
+      key: 'completed',
+      label: 'Completate',
+      color: 'var(--chart-done)',
+      values: this.trend().completed,
+    },
+  ]);
+
+  protected readonly openSeries = computed<TimeSeries[]>(() => [
+    { key: 'open', label: 'Aperte', color: 'var(--color-primary)', values: this.trend().open },
+  ]);
+
+  protected readonly hoursAvailable = computed(() => this.hours() !== null);
+  protected readonly hoursSeries = computed<TimeSeries[]>(() => {
+    const sector = this.sector();
+    const person = this.trendPerson();
+    const rows = (this.hours() ?? []).filter(
+      (row) =>
+        (!person || row.username === person) &&
+        (!sector || (sector === NO_SECTOR ? !row.settore : row.settore === sector)),
+    );
+    return [
+      {
+        key: 'hours',
+        label: 'Ore',
+        color: 'var(--color-primary)',
+        values: weeklyHours(rows, this.weeks()),
+      },
+    ];
+  });
+
+  /** Frase di sintesi sotto i grafici: il lavoro accumulato cresce o cala? */
+  protected readonly trendSummary = computed(() => {
+    const { created, completed, open } = this.trend();
+    const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
+    const createdTotal = sum(created);
+    const completedTotal = sum(completed);
+    const first = open[0] ?? 0;
+    const last = open[open.length - 1] ?? 0;
+    const direction =
+      last > first
+        ? `le task aperte sono salite da ${first} a ${last}`
+        : last < first
+          ? `le task aperte sono scese da ${first} a ${last}`
+          : `le task aperte sono rimaste ${last}`;
+    return `${createdTotal} create, ${completedTotal} completate: ${direction}.`;
   });
 
   protected readonly counts = computed(() => countByStatus(this.tasks()));
@@ -89,6 +178,10 @@ export class StatsPage {
       .load()
       .catch((error) => this.toast.error(error))
       .finally(() => this.loading.set(false));
+    // Un anno di ore basta per tutti i periodi
+    firstValueFrom(this.api.get<{ hours: HoursRow[] }>('stats.php', { days: '371' }))
+      .then((result) => this.hours.set(result.hours))
+      .catch(() => this.hours.set(null));
   }
 
   protected avatar(name: string): string {
