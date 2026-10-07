@@ -45,6 +45,21 @@ table.data {
 .signal {
   border-left-width: 4px;
 
+  .signal-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .signal-body {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+  .btn {
+    flex: none;
+  }
+
   &.is-alta {
     border-left-color: var(--st-blocked-fg);
   }

@@ -6,7 +6,7 @@ date_default_timezone_set('Europe/Rome');
 
 // Versione dello schema: aumentarla quando si aggiunge una migrazione in
 // bootstrapDatabase(), così viene eseguita una sola volta.
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const TASK_STATUSES = ['Da fare', 'In corso', 'Completato', 'Bloccato'];
 const TASK_PRIORITIES = ['Bassa', 'Media', 'Alta'];
@@ -161,6 +161,20 @@ function bootstrapDatabase(array $config, string $markerFile): void
             attempted_at DATETIME NOT NULL,
             INDEX idx_attempts_username (username, attempted_at),
             INDEX idx_attempts_ip (ip, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+
+    // Segnali del riepilogo segnati dagli admin come falsi positivi: non compaiono
+    // più tra quelli da verificare. signal_key identifica il segnale (vedi report.php).
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS signal_dismissals (
+            signal_key CHAR(40) PRIMARY KEY,
+            type VARCHAR(30) NOT NULL,
+            username VARCHAR(100) NOT NULL,
+            task_id VARCHAR(100) NULL,
+            detail TEXT NULL,
+            dismissed_by VARCHAR(100) NOT NULL,
+            dismissed_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
 

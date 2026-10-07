@@ -7,7 +7,8 @@ require __DIR__ . '/database.php';
 startSecureSession();
 sendApiHeaders();
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+$method = $_SERVER['REQUEST_METHOD'];
+if (!in_array($method, ['GET', 'POST', 'DELETE'], true)) {
     jsonResponse(['success' => false, 'error' => 'Metodo non consentito'], 405);
 }
 
@@ -17,6 +18,43 @@ if (!isAdministrator($sessionUser)) {
 }
 
 $pdo = getPdo();
+
+function readSignalKey(string $value): string
+{
+    $key = strtolower(trim($value));
+    if (!preg_match('/^[a-f0-9]{40}$/', $key)) {
+        jsonResponse(['success' => false, 'error' => 'Segnale non valido'], 400);
+    }
+
+    return $key;
+}
+
+// Segna un segnale come falso positivo: sparisce da quelli da verificare.
+if ($method === 'POST') {
+    $input = readJsonInput();
+    $key = readSignalKey((string) ($input['key'] ?? ''));
+    $taskId = trim((string) ($input['task_id'] ?? ''));
+    $pdo->prepare(
+        'INSERT IGNORE INTO signal_dismissals (signal_key, type, username, task_id, detail, dismissed_by, dismissed_at)
+         VALUES (:signal_key, :type, :username, :task_id, :detail, :dismissed_by, :dismissed_at)'
+    )->execute([
+        ':signal_key' => $key,
+        ':type' => mb_substr(trim((string) ($input['type'] ?? '')), 0, 30),
+        ':username' => mb_substr(trim((string) ($input['username'] ?? '')), 0, 100),
+        ':task_id' => $taskId === '' ? null : mb_substr($taskId, 0, 100),
+        ':detail' => mb_substr(trim((string) ($input['detail'] ?? '')), 0, 1000),
+        ':dismissed_by' => (string) $sessionUser['username'],
+        ':dismissed_at' => date('Y-m-d H:i:s'),
+    ]);
+    jsonResponse(['success' => true]);
+}
+
+// Annulla il falso positivo: il segnale torna tra quelli da verificare.
+if ($method === 'DELETE') {
+    $key = readSignalKey((string) ($_GET['key'] ?? ''));
+    $pdo->prepare('DELETE FROM signal_dismissals WHERE signal_key = :signal_key')->execute([':signal_key' => $key]);
+    jsonResponse(['success' => true]);
+}
 
 // Soglie dei segnali anomali.
 const STALE_DAYS = 7;          // attività aperta senza aggiornamenti
@@ -76,9 +114,21 @@ foreach ($tasks as $task) {
     $ensureUser((string) $task['utente']);
 }
 
+// Falsi positivi: segnali che gli admin hanno già verificato.
+$dismissals = [];
+foreach ($pdo->query('SELECT signal_key, dismissed_by, dismissed_at FROM signal_dismissals')->fetchAll() as $row) {
+    $dismissals[$row['signal_key']] = $row;
+}
+
 $signals = [];
-$addSignal = static function (string $type, string $severity, string $username, ?array $task, string $detail, ?string $at) use (&$signals, &$stats): void {
-    $signals[] = [
+$dismissedSignals = [];
+$addSignal = static function (string $type, string $severity, string $username, ?array $task, string $detail, ?string $at) use (&$signals, &$dismissedSignals, &$stats, $dismissals): void {
+    // Chiave stabile del segnale: non usa il testo o la gravità, che cambiano con i giorni
+    // (es. "Scaduta da 3 giorni"), ma il momento a cui si riferisce. Se la situazione
+    // cambia (nuova scadenza, nuovo aggiornamento) il segnale è un altro e ricompare.
+    $key = sha1(implode('|', [$type, $username, (string) ($task['id'] ?? ''), (string) $at]));
+    $signal = [
+        'key' => $key,
         'type' => $type,
         'severity' => $severity,
         'username' => $username,
@@ -87,6 +137,14 @@ $addSignal = static function (string $type, string $severity, string $username, 
         'detail' => $detail,
         'at' => $at,
     ];
+    if (isset($dismissals[$key])) {
+        $signal['dismissed_by'] = $dismissals[$key]['dismissed_by'];
+        $signal['dismissed_at'] = $dismissals[$key]['dismissed_at'];
+        $dismissedSignals[] = $signal;
+
+        return;
+    }
+    $signals[] = $signal;
     if (isset($stats[$username])) {
         $stats[$username]['segnali']++;
     }
@@ -251,6 +309,7 @@ $users = array_values(array_map(static function (array $s) use ($nowTs): array {
 
 $severityRank = ['alta' => 0, 'media' => 1, 'info' => 2];
 usort($signals, static fn ($a, $b) => [$severityRank[$a['severity']], (string) $b['at']] <=> [$severityRank[$b['severity']], (string) $a['at']]);
+usort($dismissedSignals, static fn ($a, $b) => (string) $b['dismissed_at'] <=> (string) $a['dismissed_at']);
 
 jsonResponse([
     'success' => true,
@@ -266,4 +325,5 @@ jsonResponse([
     ],
     'users' => $users,
     'signals' => $signals,
+    'dismissed_signals' => $dismissedSignals,
 ]);

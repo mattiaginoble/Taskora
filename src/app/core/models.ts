@@ -133,6 +133,8 @@ export interface ReportUser {
 }
 
 export interface ReportSignal {
+  /** Identifica il segnale, per segnarlo come falso positivo. */
+  key: string;
   type: string;
   severity: SignalSeverity;
   username: string;
@@ -140,6 +142,9 @@ export interface ReportSignal {
   progetto: string | null;
   detail: string;
   at: string | null;
+  /** Solo per i falsi positivi: chi e quando l'ha segnato. */
+  dismissed_by?: string;
+  dismissed_at?: string;
 }
 
 export interface Report {
@@ -155,6 +160,8 @@ export interface Report {
   };
   users: ReportUser[];
   signals: ReportSignal[];
+  /** Segnali segnati come falsi positivi: esclusi da signals e dal conteggio per dipendente. */
+  dismissed_signals: ReportSignal[];
 }
 
 /** Gestione (GET api/admin.php). */

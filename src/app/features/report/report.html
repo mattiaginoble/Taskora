@@ -119,8 +119,13 @@
   <div class="panel" #signalsPanel>
     <div class="page-head">
       <div>
-        <h2>Segnali da verificare ({{ signals().length }})</h2>
-        <p class="muted">Sono indizi da controllare con la persona, non prove.</p>
+        @if (showDismissed()) {
+          <h2>Falsi positivi ({{ signals().length }})</h2>
+          <p class="muted">Segnali già verificati: non contano tra quelli dei dipendenti.</p>
+        } @else {
+          <h2>Segnali da verificare ({{ signals().length }})</h2>
+          <p class="muted">Sono indizi da controllare con la persona, non prove.</p>
+        }
       </div>
       <div class="filters">
         <label class="field">
@@ -143,28 +148,76 @@
             <option value="info">Info</option>
           </select>
         </label>
+        <button
+          type="button"
+          class="btn"
+          [attr.aria-pressed]="showDismissed()"
+          (click)="setShowDismissed(!showDismissed())"
+        >
+          {{
+            showDismissed()
+              ? 'Segnali da verificare (' + activeCount() + ')'
+              : 'Falsi positivi (' + dismissedCount() + ')'
+          }}
+        </button>
       </div>
     </div>
 
     <ul class="entry-list">
-      @for (signal of visibleSignals(); track $index) {
+      @for (signal of visibleSignals(); track signal.key) {
         <li class="entry signal" [class]="'entry signal is-' + signal.severity">
-          <p class="entry-meta">
-            <span class="severity">{{ signal.severity }}</span>
-            <strong>{{ signal.label }}</strong>
-            <span>{{ signal.name }}</span>
-            @if (signal.progetto) {
-              <span>· {{ signal.progetto }}</span>
+          <div class="signal-row">
+            <div class="signal-body">
+              <p class="entry-meta">
+                <span class="severity">{{ signal.severity }}</span>
+                <strong>{{ signal.label }}</strong>
+                <span>{{ signal.name }}</span>
+                @if (signal.progetto) {
+                  <span>· {{ signal.progetto }}</span>
+                }
+                @if (signal.at) {
+                  <span>· {{ formatDateTime(signal.at) }}</span>
+                }
+              </p>
+              <p class="entry-text">{{ signal.detail }}</p>
+              @if (signal.dismissed_at) {
+                <p class="entry-meta">
+                  Falso positivo per {{ signal.dismissedBy }} ·
+                  {{ formatDateTime(signal.dismissed_at) }}
+                </p>
+              }
+            </div>
+            @if (showDismissed()) {
+              <button
+                type="button"
+                class="btn btn-sm"
+                [disabled]="savingKey() === signal.key"
+                (click)="restore(signal.source)"
+              >
+                Ripristina
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn-sm"
+                title="Il segnale è stato verificato e non indica un problema"
+                [disabled]="savingKey() === signal.key"
+                (click)="dismiss(signal.source)"
+              >
+                Falso positivo
+              </button>
             }
-            @if (signal.at) {
-              <span>· {{ formatDateTime(signal.at) }}</span>
-            }
-          </p>
-          <p class="entry-text">{{ signal.detail }}</p>
+          </div>
         </li>
       } @empty {
         <li class="muted">
-          {{ loading() ? 'Caricamento...' : 'Nessun segnale per i filtri scelti.' }}
+          {{
+            loading()
+              ? 'Caricamento...'
+              : showDismissed()
+                ? 'Nessun falso positivo per i filtri scelti.'
+                : 'Nessun segnale per i filtri scelti.'
+          }}
         </li>
       }
     </ul>

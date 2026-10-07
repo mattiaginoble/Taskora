@@ -16,7 +16,7 @@ L'app usa indirizzi con `#` (es. `index.html#/task`), così funziona in qualsias
 | `#/dashboard` | tutti | Schede per settore, una colonna per persona e una card per progetto; nel dettaglio l'elenco delle task del progetto e la task scelta da aggiornare |
 | `#/statistiche` | tutti | Grafici a ciambella sugli stati delle task: in generale e per persona, filtrabili per settore (i dipendenti vedono solo le proprie) |
 | `#/task` | admin | Tabella di tutte le task: filtri, ordinamento, modifica completa, completamento in blocco, eliminazione |
-| `#/riepilogo` | admin | Andamento per dipendente e segnali da verificare, filtrabili per settore e periodo |
+| `#/riepilogo` | admin | Andamento per dipendente e segnali da verificare, filtrabili per settore e periodo; un segnale verificato si può segnare come falso positivo (e ripristinare) |
 | `#/gestione` | admin | Utenti (creazione, nome visualizzato, ruolo, reset password), settori e progetti |
 
 Dal menu utente ognuno può cambiare il proprio nome visualizzato e la password.
@@ -93,3 +93,5 @@ Le migrazioni partono da sole alla prima richiesta dopo un aggiornamento e vengo
 ## Registro eventi
 
 Ogni modifica a una task finisce nella tabella `task_events` (chi, cosa, quando, valore prima e dopo). L'applicazione non modifica né cancella mai queste righe e le task eliminate restano nel database (`deleted_at`). Il registro è visibile agli admin nel dettaglio di ogni task e alimenta i segnali del riepilogo.
+
+I segnali segnati come falsi positivi finiscono nella tabella `signal_dismissals` (chi e quando). Restano esclusi finché la situazione non cambia: se una task ferma riceve un aggiornamento e poi si ferma di nuovo, o una task scaduta ha una nuova scadenza superata, il segnale è nuovo e ricompare.
