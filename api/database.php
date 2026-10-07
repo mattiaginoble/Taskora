@@ -6,7 +6,7 @@ date_default_timezone_set('Europe/Rome');
 
 // Versione dello schema: aumentarla quando si aggiunge una migrazione in
 // bootstrapDatabase(), così viene eseguita una sola volta.
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 12;
 
 const TASK_STATUSES = ['Da fare', 'In corso', 'Completato', 'Bloccato'];
 const TASK_PRIORITIES = ['Bassa', 'Media', 'Alta'];
@@ -164,6 +164,21 @@ function bootstrapDatabase(array $config, string $markerFile): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
 
+    // Segnali del riepilogo segnati dagli admin come falsi positivi: non compaiono
+    // più tra quelli da verificare. signal_key identifica il segnale (vedi report.php).
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS signal_dismissals (
+            signal_key CHAR(40) PRIMARY KEY,
+            type VARCHAR(30) NOT NULL,
+            username VARCHAR(100) NOT NULL,
+            task_id VARCHAR(100) NULL,
+            detail TEXT NULL,
+            reason TEXT NULL,
+            dismissed_by VARCHAR(100) NOT NULL,
+            dismissed_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+
     $columns = [
         ['users', 'role', "VARCHAR(50) NOT NULL DEFAULT 'user'"],
         ['users', 'must_change_password', 'TINYINT(1) NOT NULL DEFAULT 0'],
@@ -183,6 +198,8 @@ function bootstrapDatabase(array $config, string $markerFile): void
         ['tasks', 'creato_da', 'VARCHAR(100) NULL'],
         // Testo della task. Prima stava nella prima riga di note, che ora contiene solo le note.
         ['tasks', 'titolo', 'TEXT NULL'],
+        // Perché l'admin ha segnato il segnale come falso positivo (facoltativo).
+        ['signal_dismissals', 'reason', 'TEXT NULL'],
     ];
     foreach ($columns as [$table, $column, $definition]) {
         if (!hasColumn($pdo, $table, $column)) {

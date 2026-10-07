@@ -1,0 +1,89 @@
+<section class="page-scroll">
+  <div class="page-head">
+    <div>
+      <h1>Statistiche</h1>
+      <p class="muted">
+        {{ loading() ? 'Caricamento...' : 'Stato di avanzamento delle task' }}
+      </p>
+    </div>
+    <div class="filters">
+      <label class="field">
+        <span>Settore</span>
+        <select [value]="sector()" (change)="sector.set($any($event.target).value)">
+          <option value="">Tutti</option>
+          @for (item of work.sectors(); track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+          @if (hasNoSector()) {
+            <option [value]="noSector">Senza settore</option>
+          }
+        </select>
+      </label>
+    </div>
+  </div>
+
+  @if (!loading()) {
+    <div class="tiles">
+      <div class="tile">
+        <span class="tile-label">Task</span>
+        <strong>{{ totals().total }}</strong>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Completate</span>
+        <strong>{{ totals().completedPercent }}%</strong>
+        <span class="muted">{{ totals().completed }} su {{ totals().total }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">In corso</span>
+        <strong>{{ totals().inProgress }}</strong>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Bloccate</span>
+        <strong>{{ totals().blocked }}</strong>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Scadute</span>
+        <strong>{{ totals().overdue }}</strong>
+        <span class="muted">non completate</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>{{ session.isAdmin() ? 'Tutte le task' : 'Le tue task' }}</h2>
+      @if (totals().total === 0) {
+        <p class="muted">Nessuna task da mostrare.</p>
+      } @else {
+        <app-status-donut class="overall" [counts]="counts()" />
+      }
+    </div>
+
+    @if (persons().length > 1) {
+      <div class="panel">
+        <div>
+          <h2>Per persona</h2>
+          <p class="muted">
+            {{ persons().length }} persone · passa sopra il grafico per vedere ogni stato
+          </p>
+        </div>
+        <div class="persons">
+          @for (person of persons(); track person.username) {
+            <article class="person">
+              <header>
+                <span class="avatar" aria-hidden="true">{{ avatar(person.name) }}</span>
+                <h3>{{ person.name }}</h3>
+                <span class="muted small"> {{ person.totals.completedPercent }}% completate </span>
+              </header>
+              <app-status-donut size="sm" [counts]="person.counts" />
+              @if (person.totals.overdue > 0) {
+                <p class="overdue small">
+                  {{ person.totals.overdue }}
+                  {{ person.totals.overdue === 1 ? 'task scaduta' : 'task scadute' }}
+                </p>
+              }
+            </article>
+          }
+        </div>
+      </div>
+    }
+  }
+</section>

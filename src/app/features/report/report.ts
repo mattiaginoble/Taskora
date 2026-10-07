@@ -1,9 +1,19 @@
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/api';
-import { Report, ReportUser, SignalSeverity } from '../../core/models';
+import { Report, ReportSignal, ReportUser, SignalSeverity } from '../../core/models';
 import { PeopleService } from '../../core/people';
-import { formatDate, formatDateTime } from '../../core/task-utils';
+import { SessionService } from '../../core/session';
+import { formatDate, formatDateTime, todayIso } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -25,6 +35,9 @@ const PERIODS = [
   { days: 90, label: 'Ultimi 90 giorni' },
   { days: 365, label: 'Ultimo anno' },
 ];
+
+/** Lunghezza massima del motivo di un falso positivo (come in api/report.php). */
+const MAX_REASON_LENGTH = 500;
 
 /** Segnali mostrati per volta: con tanti dipendenti l'elenco diventa lunghissimo. */
 const SIGNALS_PAGE = 25;
@@ -73,6 +86,13 @@ const COLUMNS: { field: SortField; label: string; title?: string; num?: boolean 
 
 type NamedUser = ReportUser & { name: string };
 
+const SEVERITY_RANK: Record<SignalSeverity, number> = { alta: 0, media: 1, info: 2 };
+
+/** Stesso ordine del server: prima i più gravi, poi i più recenti. */
+const bySeverity = (a: ReportSignal, b: ReportSignal): number =>
+  SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+  String(b.at ?? '').localeCompare(String(a.at ?? ''));
+
 /** Riepilogo per gli admin: andamento per dipendente e segnali da verificare. */
 @Component({
   selector: 'app-report',
@@ -83,6 +103,8 @@ export class ReportPage {
   private readonly api = inject(ApiService);
   private readonly people = inject(PeopleService);
   private readonly toast = inject(ToastService);
+  private readonly session = inject(SessionService);
+  private readonly injector = inject(Injector);
 
   protected readonly periods = PERIODS;
   protected readonly columns = COLUMNS;
@@ -104,6 +126,14 @@ export class ReportPage {
     asc: true,
   });
   protected readonly signalsLimit = signal(SIGNALS_PAGE);
+  /** Elenco mostrato: i segnali da verificare o quelli segnati come falsi positivi. */
+  protected readonly showDismissed = signal(false);
+  /** Segnale in salvataggio, per disattivarne il pulsante. */
+  protected readonly savingKey = signal('');
+  /** Segnale con il modulo "falso positivo" aperto e motivo scritto. */
+  protected readonly dismissingKey = signal('');
+  protected readonly reason = signal('');
+  protected readonly maxReasonLength = MAX_REASON_LENGTH;
 
   private readonly allUsers = computed<NamedUser[]>(() =>
     (this.report()?.users ?? []).map((user) => ({
@@ -149,14 +179,18 @@ export class ReportPage {
     const names = new Set([
       ...report.users.map((u) => u.username),
       ...report.signals.map((s) => s.username),
+      ...report.dismissed_signals.map((s) => s.username),
     ]);
     return [...names]
       .map((username) => ({ username, name: this.people.name(username) }))
       .sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
   });
 
+  protected readonly activeCount = computed(() => this.report()?.signals.length ?? 0);
+  protected readonly dismissedCount = computed(() => this.report()?.dismissed_signals.length ?? 0);
+
   protected readonly signals = computed(() =>
-    (this.report()?.signals ?? [])
+    ((this.showDismissed() ? this.report()?.dismissed_signals : this.report()?.signals) ?? [])
       .filter(
         (s) =>
           (!this.signalUser() || s.username === this.signalUser()) &&
@@ -166,6 +200,8 @@ export class ReportPage {
         ...s,
         label: SIGNAL_LABELS[s.type] ?? s.type,
         name: this.people.name(s.username),
+        dismissedBy: this.people.name(s.dismissed_by),
+        source: s,
       })),
   );
 
@@ -232,6 +268,107 @@ export class ReportPage {
   protected setSeverity(value: SignalSeverity | ''): void {
     this.severity.set(value);
     this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  protected setShowDismissed(value: boolean): void {
+    this.closeDismiss();
+    this.showDismissed.set(value);
+    this.signalsLimit.set(SIGNALS_PAGE);
+  }
+
+  protected openDismiss(signal: ReportSignal): void {
+    this.dismissingKey.set(signal.key);
+    this.reason.set('');
+    // Il campo compare dopo il clic: il focus va dato a mano
+    afterNextRender(
+      () =>
+        this.signalsPanel()
+          ?.nativeElement.querySelector<HTMLTextAreaElement>('.dismiss-form textarea')
+          ?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  protected closeDismiss(): void {
+    this.dismissingKey.set('');
+    this.reason.set('');
+  }
+
+  /** Segna il segnale come falso positivo: esce dall'elenco e dal conteggio del dipendente. */
+  protected async dismiss(signal: ReportSignal): Promise<void> {
+    const reason = this.reason().trim();
+    this.savingKey.set(signal.key);
+    try {
+      await firstValueFrom(
+        this.api.post('report.php', {
+          key: signal.key,
+          type: signal.type,
+          username: signal.username,
+          task_id: signal.task_id,
+          detail: signal.detail,
+          reason,
+        }),
+      );
+      const now = new Date();
+      const dismissed: ReportSignal = {
+        ...signal,
+        dismissed_by: this.session.user()?.username ?? '',
+        dismissed_at: `${todayIso(now)} ${now.toTimeString().slice(0, 8)}`,
+        dismissed_reason: reason || null,
+      };
+      this.moveSignal(signal.username, -1, (report) => ({
+        signals: report.signals.filter((s) => s.key !== signal.key),
+        dismissed_signals: [dismissed, ...report.dismissed_signals],
+      }));
+      this.closeDismiss();
+      this.toast.show('Segnale segnato come falso positivo');
+    } catch (error) {
+      this.toast.error(error);
+    } finally {
+      this.savingKey.set('');
+    }
+  }
+
+  /** Il segnale torna tra quelli da verificare. */
+  protected async restore(signal: ReportSignal): Promise<void> {
+    this.savingKey.set(signal.key);
+    try {
+      await firstValueFrom(this.api.delete('report.php', { key: signal.key }));
+      const {
+        dismissed_by: _by,
+        dismissed_at: _at,
+        dismissed_reason: _reason,
+        ...restored
+      } = signal;
+      this.moveSignal(signal.username, 1, (report) => ({
+        signals: [...report.signals, restored].sort(bySeverity),
+        dismissed_signals: report.dismissed_signals.filter((s) => s.key !== signal.key),
+      }));
+      this.toast.show('Segnale di nuovo da verificare');
+    } catch (error) {
+      this.toast.error(error);
+    } finally {
+      this.savingKey.set('');
+    }
+  }
+
+  /** Aggiorna gli elenchi e il conteggio del dipendente senza ricaricare il riepilogo. */
+  private moveSignal(
+    username: string,
+    countChange: number,
+    lists: (report: Report) => Pick<Report, 'signals' | 'dismissed_signals'>,
+  ): void {
+    this.report.update((report) =>
+      report
+        ? {
+            ...report,
+            ...lists(report),
+            users: report.users.map((u) =>
+              u.username === username ? { ...u, segnali: Math.max(0, u.segnali + countChange) } : u,
+            ),
+          }
+        : report,
+    );
   }
 
   protected showMoreSignals(): void {
