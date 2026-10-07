@@ -145,6 +145,8 @@ export interface ReportSignal {
   /** Solo per i falsi positivi: chi e quando l'ha segnato. */
   dismissed_by?: string;
   dismissed_at?: string;
+  /** Perché è un falso positivo (facoltativo). */
+  dismissed_reason?: string | null;
 }
 
 export interface Report {

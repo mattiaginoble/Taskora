@@ -19,6 +19,9 @@ if (!isAdministrator($sessionUser)) {
 
 $pdo = getPdo();
 
+// Lunghezza massima del motivo di un falso positivo.
+const MAX_REASON_LENGTH = 500;
+
 function readSignalKey(string $value): string
 {
     $key = strtolower(trim($value));
@@ -34,15 +37,20 @@ if ($method === 'POST') {
     $input = readJsonInput();
     $key = readSignalKey((string) ($input['key'] ?? ''));
     $taskId = trim((string) ($input['task_id'] ?? ''));
+    $reason = trim((string) ($input['reason'] ?? ''));
+    if (mb_strlen($reason) > MAX_REASON_LENGTH) {
+        jsonResponse(['success' => false, 'error' => 'Il motivo può avere al massimo ' . MAX_REASON_LENGTH . ' caratteri'], 422);
+    }
     $pdo->prepare(
-        'INSERT IGNORE INTO signal_dismissals (signal_key, type, username, task_id, detail, dismissed_by, dismissed_at)
-         VALUES (:signal_key, :type, :username, :task_id, :detail, :dismissed_by, :dismissed_at)'
+        'INSERT IGNORE INTO signal_dismissals (signal_key, type, username, task_id, detail, reason, dismissed_by, dismissed_at)
+         VALUES (:signal_key, :type, :username, :task_id, :detail, :reason, :dismissed_by, :dismissed_at)'
     )->execute([
         ':signal_key' => $key,
         ':type' => mb_substr(trim((string) ($input['type'] ?? '')), 0, 30),
         ':username' => mb_substr(trim((string) ($input['username'] ?? '')), 0, 100),
         ':task_id' => $taskId === '' ? null : mb_substr($taskId, 0, 100),
         ':detail' => mb_substr(trim((string) ($input['detail'] ?? '')), 0, 1000),
+        ':reason' => $reason === '' ? null : $reason,
         ':dismissed_by' => (string) $sessionUser['username'],
         ':dismissed_at' => date('Y-m-d H:i:s'),
     ]);
@@ -116,7 +124,7 @@ foreach ($tasks as $task) {
 
 // Falsi positivi: segnali che gli admin hanno già verificato.
 $dismissals = [];
-foreach ($pdo->query('SELECT signal_key, dismissed_by, dismissed_at FROM signal_dismissals')->fetchAll() as $row) {
+foreach ($pdo->query('SELECT signal_key, reason, dismissed_by, dismissed_at FROM signal_dismissals')->fetchAll() as $row) {
     $dismissals[$row['signal_key']] = $row;
 }
 
@@ -140,6 +148,7 @@ $addSignal = static function (string $type, string $severity, string $username, 
     if (isset($dismissals[$key])) {
         $signal['dismissed_by'] = $dismissals[$key]['dismissed_by'];
         $signal['dismissed_at'] = $dismissals[$key]['dismissed_at'];
+        $signal['dismissed_reason'] = $dismissals[$key]['reason'];
         $dismissedSignals[] = $signal;
 
         return;

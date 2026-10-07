@@ -94,4 +94,4 @@ Le migrazioni partono da sole alla prima richiesta dopo un aggiornamento e vengo
 
 Ogni modifica a una task finisce nella tabella `task_events` (chi, cosa, quando, valore prima e dopo). L'applicazione non modifica né cancella mai queste righe e le task eliminate restano nel database (`deleted_at`). Il registro è visibile agli admin nel dettaglio di ogni task e alimenta i segnali del riepilogo.
 
-I segnali segnati come falsi positivi finiscono nella tabella `signal_dismissals` (chi e quando). Restano esclusi finché la situazione non cambia: se una task ferma riceve un aggiornamento e poi si ferma di nuovo, o una task scaduta ha una nuova scadenza superata, il segnale è nuovo e ricompare.
+I segnali segnati come falsi positivi finiscono nella tabella `signal_dismissals` (chi, quando e, se scritto, il motivo). Restano esclusi finché la situazione non cambia: se una task ferma riceve un aggiornamento e poi si ferma di nuovo, o una task scaduta ha una nuova scadenza superata, il segnale è nuovo e ricompare.

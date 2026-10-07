@@ -6,7 +6,7 @@ date_default_timezone_set('Europe/Rome');
 
 // Versione dello schema: aumentarla quando si aggiunge una migrazione in
 // bootstrapDatabase(), così viene eseguita una sola volta.
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const TASK_STATUSES = ['Da fare', 'In corso', 'Completato', 'Bloccato'];
 const TASK_PRIORITIES = ['Bassa', 'Media', 'Alta'];
@@ -173,6 +173,7 @@ function bootstrapDatabase(array $config, string $markerFile): void
             username VARCHAR(100) NOT NULL,
             task_id VARCHAR(100) NULL,
             detail TEXT NULL,
+            reason TEXT NULL,
             dismissed_by VARCHAR(100) NOT NULL,
             dismissed_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
@@ -197,6 +198,8 @@ function bootstrapDatabase(array $config, string $markerFile): void
         ['tasks', 'creato_da', 'VARCHAR(100) NULL'],
         // Testo della task. Prima stava nella prima riga di note, che ora contiene solo le note.
         ['tasks', 'titolo', 'TEXT NULL'],
+        // Perché l'admin ha segnato il segnale come falso positivo (facoltativo).
+        ['signal_dismissals', 'reason', 'TEXT NULL'],
     ];
     foreach ($columns as [$table, $column, $definition]) {
         if (!hasColumn($pdo, $table, $column)) {

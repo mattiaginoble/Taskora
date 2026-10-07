@@ -185,6 +185,11 @@
                   Falso positivo per {{ signal.dismissedBy }} ·
                   {{ formatDateTime(signal.dismissed_at) }}
                 </p>
+                @if (signal.dismissed_reason) {
+                  <p class="reason">
+                    <span class="muted">Motivo:</span> {{ signal.dismissed_reason }}
+                  </p>
+                }
               }
             </div>
             @if (showDismissed()) {
@@ -196,18 +201,45 @@
               >
                 Ripristina
               </button>
-            } @else {
+            } @else if (dismissingKey() !== signal.key) {
               <button
                 type="button"
                 class="btn btn-sm"
                 title="Il segnale è stato verificato e non indica un problema"
-                [disabled]="savingKey() === signal.key"
-                (click)="dismiss(signal.source)"
+                (click)="openDismiss(signal.source)"
               >
                 Falso positivo
               </button>
             }
           </div>
+          @if (dismissingKey() === signal.key && !showDismissed()) {
+            <form
+              class="dismiss-form"
+              (submit)="$event.preventDefault(); dismiss(signal.source)"
+              (keydown.escape)="closeDismiss()"
+            >
+              <label class="field">
+                <span>Perché è un falso positivo? <small>(facoltativo)</small></span>
+                <textarea
+                  rows="2"
+                  placeholder="Es. scadenza concordata a voce, task in pausa per ferie..."
+                  [attr.maxlength]="maxReasonLength"
+                  [value]="reason()"
+                  (input)="reason.set($any($event.target).value)"
+                ></textarea>
+              </label>
+              <div class="dismiss-actions">
+                <button type="button" class="btn btn-sm" (click)="closeDismiss()">Annulla</button>
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-primary"
+                  [disabled]="savingKey() === signal.key"
+                >
+                  Segna come falso positivo
+                </button>
+              </div>
+            </form>
+          }
         </li>
       } @empty {
         <li class="muted">
