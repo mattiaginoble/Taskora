@@ -131,6 +131,39 @@
       </div>
     </div>
 
+    <div class="panel">
+      <div>
+        <h2>Scadenze e carico</h2>
+        <p class="muted">Solo le task aperte. Rosso: scadute; ambra: in scadenza entro 7 giorni.</p>
+      </div>
+      @if (loadRows().length === 0) {
+        <p class="muted">Nessuna task aperta.</p>
+      } @else {
+        <div class="deadlines">
+          <section>
+            <h3>Task aperte per persona</h3>
+            @if (loadRows().length > 1) {
+              <p class="muted note">Clic su una persona per vedere solo le sue scadenze.</p>
+            }
+            <app-stacked-bars
+              label="Task aperte per persona e urgenza"
+              [rows]="loadRows()"
+              [series]="dueSeries"
+              [selectedRow]="loadPerson()"
+              (selected)="selectLoad($event)"
+            />
+          </section>
+          <section>
+            <h3>Linea del tempo delle scadenze</h3>
+            <p class="muted note">
+              Quattro settimane indietro e sei avanti; passa sopra un pallino per vedere le task.
+            </p>
+            <app-deadline-timeline [rows]="timelineRows()" />
+          </section>
+        </div>
+      }
+    </div>
+
     @if (persons().length > 1) {
       <div class="panel">
         <div>

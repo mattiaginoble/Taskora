@@ -4,11 +4,13 @@ import { ApiService } from '../../core/api';
 import { Task, TaskStatus } from '../../core/models';
 import { PeopleService } from '../../core/people';
 import { SessionService } from '../../core/session';
-import { countByStatus, isOverdue } from '../../core/task-utils';
+import { DueBucket, countByStatus, dueBucket, isOverdue } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
 import { WorkService } from '../../core/work';
 import { StatusDonut } from '../../shared/status-donut';
+import { BarRow, BarSelection, BarSeries, StackedBars } from '../../shared/stacked-bars';
 import { TimeChart, TimeSeries } from '../../shared/time-chart';
+import { DeadlineTimeline, TimelineRow } from './deadline-timeline';
 import { HoursRow, lastWeeks, weeklyHours, weeklyTrend } from './trend';
 
 /** Filtro "Senza settore": task create prima che il settore fosse obbligatorio. */
@@ -18,6 +20,14 @@ const PERIODS = [
   { weeks: 12, label: 'Ultime 12 settimane' },
   { weeks: 26, label: 'Ultimi 6 mesi' },
   { weeks: 52, label: 'Ultimo anno' },
+];
+
+/** Urgenza delle task aperte: stessi colori della gravità dei segnali. */
+const DUE_SERIES: (BarSeries & { key: DueBucket })[] = [
+  { key: 'overdue', label: 'Scadute', color: 'var(--chart-sev-high)' },
+  { key: 'soon', label: 'Entro 7 giorni', color: 'var(--chart-sev-medium)' },
+  { key: 'later', label: 'Più avanti', color: 'var(--chart-sev-info)' },
+  { key: 'none', label: 'Senza scadenza', color: 'var(--chart-todo)' },
 ];
 
 interface Totals {
@@ -48,7 +58,7 @@ const totalsOf = (tasks: Task[], counts: Record<TaskStatus, number>): Totals => 
 /** Grafici sugli stati delle task: in generale e per persona. */
 @Component({
   selector: 'app-stats',
-  imports: [StatusDonut, TimeChart],
+  imports: [StatusDonut, TimeChart, StackedBars, DeadlineTimeline],
   templateUrl: './stats.html',
   styleUrl: './stats.scss',
 })
@@ -66,6 +76,9 @@ export class StatsPage {
   /** Andamento nel tempo: settimane mostrate e persona scelta (vuoto = tutti). */
   protected readonly weeksCount = signal(12);
   protected readonly trendPerson = signal('');
+  /** Scadenze e carico: persona scelta dal grafico del carico (vuoto = tutti). */
+  protected readonly loadPerson = signal('');
+  protected readonly dueSeries = DUE_SERIES;
   /** Ore registrate per giorno; null se non è stato possibile caricarle. */
   private readonly hours = signal<HoursRow[] | null>([]);
 
@@ -149,6 +162,44 @@ export class StatsPage {
           : `le task aperte sono rimaste ${last}`;
     return `${createdTotal} create, ${completedTotal} completate: ${direction}.`;
   });
+
+  private readonly openTasks = computed(() => this.tasks().filter((t) => t.stato !== 'Completato'));
+
+  /** Carico: task aperte per persona, divise per urgenza; prima chi ne ha di più. */
+  protected readonly loadRows = computed<BarRow[]>(() => {
+    const rows = new Map<string, BarRow>();
+    for (const task of this.openTasks()) {
+      const username = task.utente || 'Sconosciuto';
+      const row = rows.get(username) ?? {
+        id: username,
+        label: this.people.name(username),
+        values: {},
+      };
+      const bucket = dueBucket(task);
+      row.values[bucket] = (row.values[bucket] ?? 0) + 1;
+      rows.set(username, row);
+    }
+    const total = (row: BarRow) => Object.values(row.values).reduce((n, v) => n + v, 0);
+    return [...rows.values()].sort(
+      (a, b) =>
+        total(b) - total(a) || a.label.localeCompare(b.label, 'it', { sensitivity: 'base' }),
+    );
+  });
+
+  protected readonly timelineRows = computed<TimelineRow[]>(() =>
+    this.loadRows()
+      .filter((row) => !this.loadPerson() || row.id === this.loadPerson())
+      .map((row) => ({
+        id: row.id,
+        label: row.label,
+        tasks: this.openTasks().filter((t) => (t.utente || 'Sconosciuto') === row.id),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'it', { sensitivity: 'base' })),
+  );
+
+  protected selectLoad({ row }: BarSelection): void {
+    this.loadPerson.set(row);
+  }
 
   protected readonly counts = computed(() => countByStatus(this.tasks()));
   protected readonly totals = computed(() => totalsOf(this.tasks(), this.counts()));

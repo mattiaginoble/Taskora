@@ -99,3 +99,20 @@
     white-space: normal;
   }
 }
+
+.deadlines {
+  display: grid;
+  gap: var(--space-5);
+
+  h3 {
+    font-size: var(--text-sm);
+  }
+  .note {
+    margin-bottom: var(--space-3);
+    font-size: var(--text-xs);
+  }
+  section > h3 + app-stacked-bars,
+  section > h3 + app-deadline-timeline {
+    margin-top: var(--space-3);
+  }
+}

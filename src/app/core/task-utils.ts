@@ -259,3 +259,14 @@ export const countByStatus = (tasks: Pick<Task, 'stato'>[]): Record<TaskStatus, 
   }
   return counts;
 };
+
+/** Urgenza di una task aperta: scaduta, entro 7 giorni, più avanti o senza scadenza. */
+export type DueBucket = 'overdue' | 'soon' | 'later' | 'none';
+
+export const SOON_DAYS = 7;
+
+export const dueBucket = (task: Pick<Task, 'scadenza' | 'stato'>, now = new Date()): DueBucket => {
+  if (!task.scadenza) return 'none';
+  if (isOverdue(task.scadenza, task.stato, now)) return 'overdue';
+  return task.scadenza <= addDaysIso(SOON_DAYS, now) ? 'soon' : 'later';
+};
