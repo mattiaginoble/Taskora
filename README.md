@@ -16,7 +16,7 @@ L'app usa indirizzi con `#` (es. `index.html#/task`), così funziona in qualsias
 | `#/dashboard` | tutti | Schede per settore, una colonna per persona e una card per progetto; nel dettaglio l'elenco delle task del progetto e la task scelta da aggiornare |
 | `#/statistiche` | tutti | Grafici a ciambella sugli stati delle task: in generale e per persona, filtrabili per settore (i dipendenti vedono solo le proprie) |
 | `#/task` | admin | Tabella di tutte le task: filtri, ordinamento, modifica completa, completamento in blocco, eliminazione |
-| `#/riepilogo` | admin | Andamento per dipendente e segnali da verificare, filtrabili per settore e periodo, con grafici cliccabili dei segnali per gravità, dipendente e tipo; un segnale verificato si può segnare come falso positivo (e ripristinare) |
+| `#/riepilogo` | admin | Andamento per dipendente e segnali da verificare, filtrabili per settore e periodo, con grafici cliccabili dei segnali per gravità, dipendente e tipo e la mappa dell'attività giorno per giorno; un segnale verificato si può segnare come falso positivo (e ripristinare) |
 | `#/gestione` | admin | Utenti (creazione, nome visualizzato, ruolo, reset password), settori e progetti |
 
 Dal menu utente ognuno può cambiare il proprio nome visualizzato e la password.

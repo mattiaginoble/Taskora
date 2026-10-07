@@ -16,6 +16,7 @@ import { SessionService } from '../../core/session';
 import { formatDate, formatDateTime, todayIso } from '../../core/task-utils';
 import { ToastService } from '../../core/toast';
 import { BarRow, BarSelection, BarSeries, StackedBars } from '../../shared/stacked-bars';
+import { ActivityMap, ActivityRow } from './activity-map';
 
 const SIGNAL_LABELS: Record<string, string> = {
   overdue: 'Scaduta',
@@ -42,6 +43,9 @@ const SEVERITY_SERIES: BarSeries[] = [
   { key: 'media', label: 'Media', color: 'var(--chart-sev-medium)' },
   { key: 'info', label: 'Info', color: 'var(--chart-sev-info)' },
 ];
+
+/** Segnali legati a un giorno preciso: segnati sulla mappa dell'attività. */
+const DAY_SIGNALS = ['burst', 'progress_jump', 'history_edited', 'deleted', 'due_date_postponed'];
 
 const TYPE_SERIES: BarSeries[] = [
   { key: 'count', label: 'Segnali', color: 'var(--color-primary)' },
@@ -120,7 +124,7 @@ const bySeverity = (a: ReportSignal, b: ReportSignal): number =>
 /** Riepilogo per gli admin: andamento per dipendente e segnali da verificare. */
 @Component({
   selector: 'app-report',
-  imports: [StackedBars],
+  imports: [StackedBars, ActivityMap],
   templateUrl: './report.html',
   styleUrl: './report.scss',
 })
@@ -285,6 +289,31 @@ export class ReportPage {
     }
     return [...rows.values()].sort(byTotal);
   });
+
+  /** Mappa dell'attività: tutti i dipendenti del riepilogo, in ordine di nome. */
+  protected readonly activityRows = computed<ActivityRow[]>(() => {
+    const report = this.report();
+    if (!report) return [];
+    const marks = new Map<string, Record<string, string[]>>();
+    for (const s of report.signals) {
+      if (!s.at || !DAY_SIGNALS.includes(s.type)) continue;
+      const byDay = marks.get(s.username) ?? {};
+      const day = s.at.slice(0, 10);
+      byDay[day] = [...(byDay[day] ?? []), SIGNAL_LABELS[s.type] ?? s.type];
+      marks.set(s.username, byDay);
+    }
+    return this.allUsers()
+      .map((user) => ({
+        id: user.username,
+        label: user.name,
+        counts: report.activity?.[user.username] ?? {},
+        marks: marks.get(user.username) ?? {},
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'it', { sensitivity: 'base' }));
+  });
+
+  protected readonly activityFrom = computed(() => this.report()?.period.from.slice(0, 10) ?? '');
+  protected readonly activityTo = computed(() => this.report()?.period.to.slice(0, 10) ?? '');
 
   protected readonly visibleSignals = computed(() => this.signals().slice(0, this.signalsLimit()));
 
@@ -499,6 +528,14 @@ export class ReportPage {
   protected setSector(value: string): void {
     this.sector.set(value);
     this.load();
+  }
+
+  /** Clic su un nome della mappa: mostra i suoi segnali (o li toglie). */
+  protected selectActivityRow(username: string): void {
+    this.setSignalUser(username);
+    if (username) {
+      this.signalsPanel()?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   protected showSignals(user: ReportUser): void {

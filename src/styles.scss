@@ -73,6 +73,13 @@
   --chart-sev-high: #c53030;
   --chart-sev-medium: #d98a0b;
   --chart-sev-info: #2b63d9;
+  /* Mappa dell'attività: una sola tinta, dal chiaro (poco) allo scuro (tanto) */
+  --heat-0: rgba(95, 87, 212, 0.1);
+  --heat-weekend: rgba(40, 37, 29, 0.04);
+  --heat-1: #c9c5f3;
+  --heat-2: #9d96ea;
+  --heat-3: #6f67db;
+  --heat-4: #4038b0;
 
   color-scheme: light;
 }
@@ -122,6 +129,13 @@
   --chart-sev-high: #d94f6a;
   --chart-sev-medium: #c4870c;
   --chart-sev-info: #4a86f0;
+  /* Nel tema scuro "tanto" è la tinta più chiara */
+  --heat-0: rgba(143, 137, 236, 0.18);
+  --heat-weekend: rgba(255, 255, 255, 0.025);
+  --heat-1: #3d3a7a;
+  --heat-2: #5b55b8;
+  --heat-3: #8580e8;
+  --heat-4: #c4c0f7;
 
   color-scheme: dark;
 }

@@ -116,6 +116,25 @@
     </div>
   </div>
 
+  @if (activityRows().length > 0) {
+    <div class="panel">
+      <div>
+        <h2>Mappa dell'attività</h2>
+        <p class="muted">
+          Task create, note e modifiche registrate da ogni dipendente nel periodo. I buchi lunghi e
+          le caselle con il bordo rosso sono da guardare; clic su un nome per vederne i segnali.
+        </p>
+      </div>
+      <app-activity-map
+        [from]="activityFrom()"
+        [to]="activityTo()"
+        [rows]="activityRows()"
+        [selectedRow]="signalUser()"
+        (selected)="selectActivityRow($event)"
+      />
+    </div>
+  }
+
   <div class="panel" #signalsPanel>
     <div class="page-head">
       <div>
