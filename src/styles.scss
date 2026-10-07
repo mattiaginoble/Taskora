@@ -64,6 +64,16 @@
   --bar-late: linear-gradient(90deg, #c2410c, #b91c1c);
   --bar-late-track: rgba(194, 65, 12, 0.15);
 
+  /* Colori dei grafici: verificati per chi distingue male i colori (rosso/verde).
+     Sono diversi da quelli dei badge, pensati per il testo. */
+  --chart-todo: #9c9a92;
+  --chart-progress: #2b63d9;
+  --chart-done: #1f9e6e;
+  --chart-blocked: #c53030;
+  --chart-sev-high: #c53030;
+  --chart-sev-medium: #d98a0b;
+  --chart-sev-info: #2b63d9;
+
   color-scheme: light;
 }
 
@@ -104,6 +114,14 @@
 
   --bar-track: rgba(143, 137, 236, 0.16);
   --bar-late-track: rgba(251, 146, 60, 0.15);
+
+  --chart-todo: #77756f;
+  --chart-progress: #4a86f0;
+  --chart-done: #2a9f78;
+  --chart-blocked: #e5484d;
+  --chart-sev-high: #d94f6a;
+  --chart-sev-medium: #c4870c;
+  --chart-sev-info: #4a86f0;
 
   color-scheme: dark;
 }

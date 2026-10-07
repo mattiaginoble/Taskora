@@ -148,6 +148,17 @@
             <option value="info">Info</option>
           </select>
         </label>
+        <label class="field">
+          <span>Tipo</span>
+          <select [value]="signalType()" (change)="setSignalType($any($event.target).value)">
+            <option value="">Tutti</option>
+            @for (item of signalTypes(); track item.type) {
+              <option [value]="item.type" [selected]="item.type === signalType()">
+                {{ item.label }}
+              </option>
+            }
+          </select>
+        </label>
         <button
           type="button"
           class="btn"
@@ -162,6 +173,57 @@
         </button>
       </div>
     </div>
+
+    @if (!showDismissed() && activeCount() > 0) {
+      <div class="overview">
+        <div class="severity-tiles" role="group" aria-label="Segnali per gravità">
+          @for (item of severityCounts(); track item.key) {
+            <button
+              type="button"
+              class="severity-tile"
+              [class]="'severity-tile is-' + item.key"
+              [attr.aria-pressed]="severity() === item.key"
+              (click)="toggleSeverity(item.key)"
+            >
+              <span class="tile-label">{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </button>
+          }
+        </div>
+        <div class="charts">
+          <section>
+            <h3>Per dipendente</h3>
+            <app-stacked-bars
+              label="Segnali da verificare per dipendente e gravità"
+              [rows]="signalsByPerson()"
+              [series]="severitySeries"
+              [selectedRow]="signalUser()"
+              [selectedSeries]="severity()"
+              (selected)="selectPersonBar($event)"
+            />
+          </section>
+          <section>
+            <h3>Per tipo</h3>
+            <app-stacked-bars
+              label="Segnali da verificare per tipo"
+              [rows]="signalsByType()"
+              [series]="typeSeries"
+              [selectedRow]="signalType()"
+              (selected)="selectTypeBar($event)"
+            />
+          </section>
+        </div>
+        <p class="muted small">
+          Clic su una barra per vedere solo quei segnali qui sotto; un secondo clic toglie il
+          filtro.
+          @if (signalUser() || severity() || signalType()) {
+            <button type="button" class="link" (click)="clearSignalFilters()">
+              Togli tutti i filtri
+            </button>
+          }
+        </p>
+      </div>
+    }
 
     <ul class="entry-list">
       @for (signal of visibleSignals(); track signal.key) {

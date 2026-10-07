@@ -1,12 +1,12 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { TASK_STATUSES, TaskStatus } from '../core/models';
 
-/** Colore di ogni stato: gli stessi dei badge, così il grafico si legge come il resto dell'app. */
+/** Colore di ogni stato: stesse tinte dei badge, regolate per i grafici (vedi styles.scss). */
 const STATUS_COLOR: Record<TaskStatus, string> = {
-  'Da fare': 'var(--st-todo-fg)',
-  'In corso': 'var(--st-progress-fg)',
-  Completato: 'var(--st-done-fg)',
-  Bloccato: 'var(--st-blocked-fg)',
+  'Da fare': 'var(--chart-todo)',
+  'In corso': 'var(--chart-progress)',
+  Completato: 'var(--chart-done)',
+  Bloccato: 'var(--chart-blocked)',
 };
 
 /** Geometria nel viewBox 0 0 120 120: raggio, spessore dell'anello e spazio tra le fette. */
