@@ -1,5 +1,6 @@
 import { Task } from './models';
 import {
+  countByStatus,
   describeSchedule,
   formatDateTime,
   groupByProject,
@@ -145,5 +146,17 @@ describe('riepilogo per progetto', () => {
       ['HDM Scan', 2],
       ['ACA', 1],
     ]);
+  });
+});
+
+describe('countByStatus', () => {
+  it('conta le task per stato, con zero per gli stati assenti', () => {
+    expect(
+      countByStatus([
+        task({ stato: 'In corso' }),
+        task({ stato: 'In corso' }),
+        task({ stato: 'Completato' }),
+      ]),
+    ).toEqual({ 'Da fare': 0, 'In corso': 2, Completato: 1, Bloccato: 0 });
   });
 });

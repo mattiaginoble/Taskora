@@ -245,3 +245,17 @@ export const formatHours = (value: number | string | null | undefined): string =
     ? 'nessuna'
     : `${hours.toLocaleString('it-IT', { maximumFractionDigits: 2 })} h`;
 };
+
+/** Numero di task per stato, sempre con tutti gli stati (anche a zero). */
+export const countByStatus = (tasks: Pick<Task, 'stato'>[]): Record<TaskStatus, number> => {
+  const counts: Record<TaskStatus, number> = {
+    'Da fare': 0,
+    'In corso': 0,
+    Completato: 0,
+    Bloccato: 0,
+  };
+  for (const task of tasks) {
+    if (task.stato in counts) counts[task.stato]++;
+  }
+  return counts;
+};
