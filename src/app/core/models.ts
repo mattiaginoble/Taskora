@@ -43,6 +43,7 @@ export interface SessionUser {
   username: string;
   role: string;
   display_name: string;
+  email?: string | null;
 }
 
 export interface Project {
@@ -172,6 +173,7 @@ export interface Report {
 export interface ManagedUser {
   id: number;
   username: string;
+  email: string | null;
   display_name: string | null;
   role: string;
   must_change_password: number | string;

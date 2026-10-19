@@ -31,7 +31,7 @@ function findUser(PDO $pdo, string $username): array
 
 if ($method === 'GET') {
     $users = $pdo->query(
-        'SELECT id, username, display_name, role, must_change_password, created_at FROM users ORDER BY username ASC'
+        'SELECT id, username, email, display_name, role, must_change_password, created_at FROM users ORDER BY username ASC'
     )->fetchAll();
     $projects = $pdo->query(
         'SELECT p.id, p.nome, p.created_at, COUNT(t.id) AS attivita
@@ -54,12 +54,16 @@ if ($method === 'POST') {
 
     if ($action === 'create_user') {
         $username = trim((string) ($input['username'] ?? ''));
+        $email = trim((string) ($input['email'] ?? ''));
         $role = (string) ($input['role'] ?? 'user');
         $password = (string) ($input['password'] ?? '');
         $displayName = normalizeDisplayName($input['display_name'] ?? '');
 
         if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $username)) {
             jsonResponse(['success' => false, 'error' => 'Nome utente: 3-50 caratteri tra lettere, numeri, punto, trattino e underscore'], 422);
+        }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            jsonResponse(['success' => false, 'error' => 'Indirizzo email non valido'], 422);
         }
         if (!in_array($role, ROLES, true)) {
             jsonResponse(['success' => false, 'error' => 'Ruolo non valido'], 422);
@@ -72,12 +76,21 @@ if ($method === 'POST') {
             jsonResponse(['success' => false, 'error' => 'Esiste già un utente con questo nome'], 422);
         }
 
+        if ($email !== '') {
+            $existsEmail = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+            $existsEmail->execute([':email' => $email]);
+            if ($existsEmail->fetch()) {
+                jsonResponse(['success' => false, 'error' => 'Esiste già un utente con questo indirizzo email'], 422);
+            }
+        }
+
         // La password scelta dall'admin va cambiata al primo accesso.
         $pdo->prepare(
-            'INSERT INTO users (username, display_name, password_hash, role, must_change_password, created_at)
-             VALUES (:username, :display_name, :hash, :role, 1, :created_at)'
+            'INSERT INTO users (username, email, display_name, password_hash, role, must_change_password, created_at)
+             VALUES (:username, :email, :display_name, :hash, :role, 1, :created_at)'
         )->execute([
             ':username' => $username,
+            ':email' => $email !== '' ? $email : null,
             ':display_name' => $displayName,
             ':hash' => password_hash($password, PASSWORD_DEFAULT),
             ':role' => $role,
@@ -110,6 +123,28 @@ if ($method === 'POST') {
         ]);
         jsonResponse(['success' => true]);
     }
+
+    if ($action === 'set_email') {
+        $user = findUser($pdo, trim((string) ($input['username'] ?? '')));
+        $email = trim((string) ($input['email'] ?? ''));
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            jsonResponse(['success' => false, 'error' => 'Indirizzo email non valido'], 422);
+        }
+        if ($email !== '') {
+            $existsEmail = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND id <> :id LIMIT 1');
+            $existsEmail->execute([':email' => $email, ':id' => (int) $user['id']]);
+            if ($existsEmail->fetch()) {
+                jsonResponse(['success' => false, 'error' => 'Esiste già un utente con questo indirizzo email'], 422);
+            }
+        }
+
+        $pdo->prepare('UPDATE users SET email = :email WHERE id = :id')->execute([
+            ':email' => $email !== '' ? $email : null,
+            ':id' => (int) $user['id'],
+        ]);
+        jsonResponse(['success' => true]);
+    }
+
 
     if ($action === 'set_role') {
         $user = findUser($pdo, trim((string) ($input['username'] ?? '')));

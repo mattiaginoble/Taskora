@@ -55,6 +55,56 @@ export class NameDialog {
 }
 
 @Component({
+  selector: 'app-email-dialog',
+  imports: [Dialog, FormsModule],
+  template: `
+    <app-dialog title="Indirizzo email" size="sm" (closed)="closed.emit()">
+      <form class="form-stack" (ngSubmit)="save()">
+        <p class="muted small" style="margin-top: 0;">
+          Riceverai una notifica email a questo indirizzo quando ti viene assegnata una nuova task.
+        </p>
+        <label class="field">
+          <span>Il tuo indirizzo email</span>
+          <input
+            type="email"
+            name="email"
+            [(ngModel)]="email"
+            maxlength="255"
+            autocomplete="email"
+            placeholder="nome@azienda.it"
+            autofocus
+          />
+        </label>
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Salvataggio...' : 'Salva email' }}
+        </button>
+      </form>
+    </app-dialog>
+  `,
+})
+export class EmailDialog {
+  protected readonly session = inject(SessionService);
+  private readonly toast = inject(ToastService);
+  readonly closed = output<void>();
+
+  protected email = this.session.user()?.email ?? '';
+  protected readonly saving = signal(false);
+
+  protected async save(): Promise<void> {
+    this.saving.set(true);
+    try {
+      await this.session.setEmail(this.email.trim());
+      this.toast.show(this.email.trim() ? 'Email aggiornata' : 'Email rimossa');
+      this.closed.emit();
+    } catch (error) {
+      this.toast.error(error);
+      this.saving.set(false);
+    }
+  }
+}
+
+
+@Component({
   selector: 'app-password-dialog',
   imports: [Dialog, FormsModule],
   template: `

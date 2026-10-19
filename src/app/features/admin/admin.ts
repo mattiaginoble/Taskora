@@ -43,6 +43,7 @@ export class AdminPage {
     (this.data()?.users ?? [])
       .map((user) => ({
         ...user,
+        email: user.email ?? null,
         role: (ADMIN_ROLES.includes(String(user.role).toLowerCase())
           ? 'administrator'
           : 'user') as Role,
@@ -67,7 +68,8 @@ export class AdminPage {
       (user) =>
         (!query ||
           user.username.toLowerCase().includes(query) ||
-          (user.display_name ?? '').toLowerCase().includes(query)) &&
+          (user.display_name ?? '').toLowerCase().includes(query) ||
+          (user.email ?? '').toLowerCase().includes(query)) &&
         (!this.roleFilter() || user.role === this.roleFilter()) &&
         (!password || user.pending === (password === 'pending')),
     );
@@ -77,6 +79,7 @@ export class AdminPage {
   protected readonly creatingUser = signal(false);
   protected newName = '';
   protected newUsername = '';
+  protected newEmail = '';
   protected newRole: Role = 'user';
   protected newPassword = '';
   // Nuovi settore e progetto
@@ -131,10 +134,12 @@ export class AdminPage {
 
   protected async createUser(): Promise<void> {
     const username = this.newUsername.trim();
+    const email = this.newEmail.trim();
     const ok = await this.run(
       {
         action: 'create_user',
         username,
+        email,
         display_name: this.newName.trim(),
         role: this.newRole,
         password: this.newPassword,
@@ -144,6 +149,7 @@ export class AdminPage {
     if (ok) {
       this.newName = '';
       this.newUsername = '';
+      this.newEmail = '';
       this.newRole = 'user';
       this.newPassword = '';
       this.creatingUser.set(false);
@@ -160,6 +166,19 @@ export class AdminPage {
         : `${user.username} compare con il nome utente`,
     );
     if (!ok) input.value = user.display_name ?? '';
+    else if (user.username === this.session.user()?.username) await this.session.refresh();
+  }
+
+  protected async saveEmail(user: ManagedUser, input: HTMLInputElement): Promise<void> {
+    const value = input.value.trim();
+    if (value === (user.email ?? '')) return;
+    const ok = await this.run(
+      { action: 'set_email', username: user.username, email: value },
+      value
+        ? `Email di ${user.display_name || user.username} aggiornata`
+        : `Email di ${user.display_name || user.username} rimossa`,
+    );
+    if (!ok) input.value = user.email ?? '';
     else if (user.username === this.session.user()?.username) await this.session.refresh();
   }
 

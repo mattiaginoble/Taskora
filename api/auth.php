@@ -59,6 +59,7 @@ if ($method === 'GET') {
     $people = fetchPeople($pdo);
     $user = sessionUserPayload($_SESSION['user']);
     $user['display_name'] = $people[$user['username']] ?? $user['username'];
+    $user['email'] = fetchUserEmail($pdo, $user['username']);
 
     jsonResponse([
         'success' => true,
@@ -135,6 +136,27 @@ if ($method === 'PUT') {
             ':id' => (int) $sessionUser['id'],
         ]);
         jsonResponse(['success' => true, 'display_name' => $displayName ?? $sessionUser['username']]);
+    }
+
+    // Ognuno può cambiare il proprio indirizzo email.
+    if (array_key_exists('email', $input) && !array_key_exists('new_password', $input)) {
+        $sessionUser = requireAuthenticatedUser();
+        $email = trim((string) $input['email']);
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            jsonResponse(['success' => false, 'error' => 'Indirizzo email non valido'], 422);
+        }
+        if ($email !== '') {
+            $existsEmail = $pdo->prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(:email) AND id <> :id LIMIT 1');
+            $existsEmail->execute([':email' => $email, ':id' => (int) $sessionUser['id']]);
+            if ($existsEmail->fetch()) {
+                jsonResponse(['success' => false, 'error' => 'Esiste già un utente con questo indirizzo email'], 422);
+            }
+        }
+        $pdo->prepare('UPDATE users SET email = :email WHERE id = :id')->execute([
+            ':email' => $email !== '' ? $email : null,
+            ':id' => (int) $sessionUser['id'],
+        ]);
+        jsonResponse(['success' => true, 'email' => $email !== '' ? $email : null]);
     }
 
     $sessionUser = requireAuthenticatedUser(true);

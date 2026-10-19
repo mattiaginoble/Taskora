@@ -81,6 +81,9 @@
           <button type="button" role="menuitem" (click)="openDialog('name')">
             Nome visualizzato
           </button>
+          <button type="button" role="menuitem" (click)="openDialog('email')">
+            Indirizzo email
+          </button>
           <button type="button" role="menuitem" (click)="openDialog('password')">
             Cambia password
           </button>
@@ -102,6 +105,9 @@
 @switch (dialog()) {
   @case ('name') {
     <app-name-dialog (closed)="dialog.set(null)" />
+  }
+  @case ('email') {
+    <app-email-dialog (closed)="dialog.set(null)" />
   }
   @case ('password') {
     <app-password-dialog (closed)="dialog.set(null)" (changed)="dialog.set(null)" />

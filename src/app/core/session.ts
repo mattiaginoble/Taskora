@@ -68,6 +68,14 @@ export class SessionService {
     if (user) this.user.set({ ...user, display_name: result.display_name });
   }
 
+  async setEmail(email: string): Promise<void> {
+    const result = await firstValueFrom(
+      this.api.put<{ email: string | null }>('auth.php', { email }),
+    );
+    const user = this.user();
+    if (user) this.user.set({ ...user, email: result.email });
+  }
+
   /** Esce e ricarica la pagina, così non resta in memoria nessun dato dell'utente. */
   async logout(): Promise<void> {
     try {

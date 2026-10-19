@@ -27,4 +27,21 @@ return [
     'charset' => 'utf8mb4',
     // Password del primo utente "admin", usata solo se la tabella utenti è vuota.
     'admin_initial_password' => $value('ADMIN_INITIAL_PASSWORD', 'admin_initial_password'),
+
+    // Notifiche email per l'assegnazione delle task
+    'mail' => [
+        // 'mail' (funzione nativa PHP) oppure 'smtp'
+        'driver' => $value('MAIL_DRIVER', 'mail_driver', 'mail'),
+        'host' => $value('MAIL_HOST', 'mail_host', 'localhost'),
+        'port' => (int) ($value('MAIL_PORT', 'mail_port', '25')),
+        'username' => $value('MAIL_USERNAME', 'mail_username', ''),
+        'password' => $value('MAIL_PASSWORD', 'mail_password', ''),
+        // '', 'tls' (STARTTLS, ad es. porta 587) o 'ssl' (SMTPS, ad es. porta 465)
+        'encryption' => $value('MAIL_ENCRYPTION', 'mail_encryption', ''),
+        'from_address' => $value('MAIL_FROM_ADDRESS', 'mail_from_address', 'noreply@taskora.local'),
+        'from_name' => $value('MAIL_FROM_NAME', 'mail_from_name', 'Taskora'),
+    ],
+    // URL base dell'applicazione per i link nelle email (es. 'https://taskora.azienda.it')
+    'app_url' => $value('APP_URL', 'app_url', ''),
 ];
+

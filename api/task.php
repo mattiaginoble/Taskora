@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/database.php';
+require __DIR__ . '/mail.php';
 
 startSecureSession();
 sendApiHeaders();
@@ -287,6 +288,10 @@ if ($method === 'POST') {
     }
     $pdo->commit();
 
+    if (strcasecmp((string) $task['utente'], (string) $currentUser) !== 0) {
+        notifyTaskAssigned($pdo, $task, $currentUser);
+    }
+
     jsonResponse(['success' => true, 'task' => fetchTaskById($pdo, $task['id'])]);
 }
 
@@ -313,6 +318,7 @@ if ($method === 'PUT') {
     }
 
     $updated = $existing;
+    $reassigned = false;
 
     // Campi modificabili da tutti: stato, avanzamento, ore e nuove note.
     if (array_key_exists('stato', $input)) {
@@ -328,7 +334,11 @@ if ($method === 'PUT') {
             $updated['titolo'] = validateTitle($input['titolo']);
         }
         if (isset($input['utente']) && trim((string) $input['utente']) !== '') {
-            $updated['utente'] = validateTaskOwner($pdo, (string) $input['utente']);
+            $newOwner = validateTaskOwner($pdo, (string) $input['utente']);
+            if (strcasecmp((string) $existing['utente'], $newOwner) !== 0) {
+                $reassigned = true;
+            }
+            $updated['utente'] = $newOwner;
         }
         if (array_key_exists('progetto', $input)) {
             $updated['progetto'] = resolveProjectName($pdo, (string) $input['progetto']);
@@ -419,6 +429,10 @@ if ($method === 'PUT') {
         logTaskEvent($pdo, $taskId, $currentUser, 'hours_logged', 'ore_lavorate', (string) $existing['ore_lavorate'], (string) $hours);
     }
     $pdo->commit();
+
+    if ($reassigned && strcasecmp((string) $updated['utente'], (string) $currentUser) !== 0) {
+        notifyTaskAssigned($pdo, $updated, $currentUser);
+    }
 
     jsonResponse(['success' => true, 'task' => fetchTaskById($pdo, $taskId)]);
 }

@@ -6,7 +6,7 @@ date_default_timezone_set('Europe/Rome');
 
 // Versione dello schema: aumentarla quando si aggiunge una migrazione in
 // bootstrapDatabase(), così viene eseguita una sola volta.
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 const TASK_STATUSES = ['Da fare', 'In corso', 'Completato', 'Bloccato'];
 const TASK_PRIORITIES = ['Bassa', 'Media', 'Alta'];
@@ -94,6 +94,7 @@ function bootstrapDatabase(array $config, string $markerFile): void
         "CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
             username VARCHAR(100) NOT NULL UNIQUE,
+            email VARCHAR(255) NULL,
             password_hash VARCHAR(255) NOT NULL,
             role VARCHAR(50) NOT NULL DEFAULT 'user',
             created_at DATETIME NOT NULL
@@ -183,6 +184,7 @@ function bootstrapDatabase(array $config, string $markerFile): void
         ['users', 'role', "VARCHAR(50) NOT NULL DEFAULT 'user'"],
         ['users', 'must_change_password', 'TINYINT(1) NOT NULL DEFAULT 0'],
         ['users', 'display_name', 'VARCHAR(100) NULL'],
+        ['users', 'email', 'VARCHAR(255) NULL'],
         ['tasks', 'assegnato_a', 'VARCHAR(100) NULL'],
         ['tasks', 'priorita', "VARCHAR(50) NOT NULL DEFAULT 'Media'"],
         ['tasks', 'settore', 'VARCHAR(50) NULL'],
@@ -395,6 +397,21 @@ function fetchPeople(PDO $pdo): array
 
     return $people;
 }
+
+// Restituisce l'indirizzo email dell'utente, se presente.
+function fetchUserEmail(PDO $pdo, string $username): ?string
+{
+    $stmt = $pdo->prepare('SELECT email FROM users WHERE LOWER(username) = LOWER(:username) LIMIT 1');
+    $stmt->execute([':username' => trim($username)]);
+    $email = $stmt->fetchColumn();
+    if ($email === false || $email === null) {
+        return null;
+    }
+    $trimmed = trim((string) $email);
+
+    return $trimmed !== '' ? $trimmed : null;
+}
+
 
 // Amministratori selezionabili come responsabili.
 function fetchAdministrators(PDO $pdo): array

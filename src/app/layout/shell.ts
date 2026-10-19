@@ -4,7 +4,7 @@ import { APP_NAME } from '../core/app-name';
 import { SessionService } from '../core/session';
 import { ThemeService } from '../core/theme';
 import { ToastService } from '../core/toast';
-import { NameDialog, PasswordDialog } from './account-dialogs';
+import { EmailDialog, NameDialog, PasswordDialog } from './account-dialogs';
 
 interface NavLink {
   label: string;
@@ -23,7 +23,7 @@ const LINKS: NavLink[] = [
 /** Struttura comune: header con menu, pagina corrente e avvisi. */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NameDialog, PasswordDialog],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NameDialog, EmailDialog, PasswordDialog],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
 })
@@ -37,9 +37,9 @@ export class Shell {
     LINKS.filter((link) => !link.admin || this.session.isAdmin()),
   );
   protected readonly menuOpen = signal(false);
-  protected readonly dialog = signal<'name' | 'password' | null>(null);
+  protected readonly dialog = signal<'name' | 'email' | 'password' | null>(null);
 
-  protected openDialog(which: 'name' | 'password'): void {
+  protected openDialog(which: 'name' | 'email' | 'password'): void {
     this.menuOpen.set(false);
     this.dialog.set(which);
   }
